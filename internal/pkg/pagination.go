@@ -1,8 +1,6 @@
 package pkg
 
 import (
-	"database/sql"
-	"fmt"
 	"gorm.io/gorm"
 )
 
@@ -102,90 +100,6 @@ func Paginate[T any, D any](
 	out := make([]*T, 0, len(rows))
 	for i := range rows {
 		item, err := converter(&rows[i])
-		if err != nil {
-			return nil, 0, err
-		}
-		out = append(out, item)
-	}
-
-	return out, total, nil
-}
-
-func PaginateNative[T any, D any](
-	query *gorm.DB,
-	pagination *PaginationParams,
-	orderBy string,
-	converter func(*D) (*T, error),
-) ([]*T, int64, error) {
-	pagination = NormalizePagination(pagination)
-
-	sqlDB, err := query.DB()
-	if err != nil {
-		return nil, 0, err
-	}
-
-	stmt := query.Statement
-	whereSQL := ""
-	whereArgs := []interface{}{}
-	
-	if stmt != nil && len(stmt.Clauses) > 0 {
-		if whereClause, ok := stmt.Clauses["WHERE"]; ok {
-			if expr, ok := whereClause.Expression.(clause.Where); ok {
-				whereSQL = expr.SQL
-				whereArgs = expr.Vars
-			}
-		}
-	}
-
-	tableName := stmt.Table
-	if tableName == "" {
-		tableName = "transactions"
-	}
-
-	offset := pagination.Offset()
-	limit := pagination.Limit
-
-	windowSQL := fmt.Sprintf(`
-		WITH paginated_data AS (
-			SELECT *, COUNT(*) OVER() as _total_count
-			FROM %s
-			%s
-			ORDER BY %s
-			LIMIT $%d OFFSET $%d
-		)
-		SELECT * FROM paginated_data
-	`, tableName, whereSQL, orderBy, len(whereArgs)+1, len(whereArgs)+2)
-
-	args := append(whereArgs, limit, offset)
-
-	rows, err := sqlDB.Query(windowSQL, args...)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer rows.Close()
-
-	var total int64
-	var dbRows []D
-	
-	for rows.Next() {
-		var row D
-		var totalCount sql.NullInt64
-		
-		err := rows.Scan(&row, &totalCount)
-		if err != nil {
-			return nil, 0, err
-		}
-		
-		if totalCount.Valid {
-			total = totalCount.Int64
-		}
-		
-		dbRows = append(dbRows, row)
-	}
-
-	out := make([]*T, 0, len(dbRows))
-	for i := range dbRows {
-		item, err := converter(&dbRows[i])
 		if err != nil {
 			return nil, 0, err
 		}
