@@ -24,8 +24,15 @@ func (h *Handler) CreateInvestment(c *gin.Context) {
 		return
 	}
 
+	accountID, err := pkg.ParseULID(body.AccountID)
+	if err != nil {
+		h.respondError(c, appErrors.NewValidationError("account_id", "formato invalido"))
+		return
+	}
+
 	req := domaincontracts.CreateInvestmentRequest{
 		UserId:        userID,
+		AccountId:     accountID,
 		Type:          body.Type,
 		Name:          body.Name,
 		InitialAmount: body.InitialAmount,
@@ -52,17 +59,17 @@ func (h *Handler) ListInvestments(c *gin.Context) {
 		return
 	}
 
+	pagination := h.parsePagination(c)
+
 	ctx := c.Request.Context()
-	investments, err := h.InvestmentService.ListInvestments(ctx, userID)
+	investments, total, err := h.InvestmentService.ListInvestments(ctx, userID, pagination)
 	if err != nil {
 		h.respondError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, contracts.InvestmentListResponse{
-		Total:       len(investments),
-		Investments: investments,
-	})
+	response := pkg.NewPaginatedResponse(investments, pagination.Page, pagination.Limit, total)
+	c.JSON(http.StatusOK, response)
 }
 
 func (h *Handler) GetInvestment(c *gin.Context) {
@@ -107,8 +114,14 @@ func (h *Handler) MakeContribution(c *gin.Context) {
 		return
 	}
 
+	accountID, err := pkg.ParseULID(body.AccountID)
+	if err != nil {
+		h.respondError(c, appErrors.NewValidationError("account_id", "formato invalido"))
+		return
+	}
+
 	ctx := c.Request.Context()
-	if err := h.InvestmentService.MakeContribution(ctx, investmentID, userID, body.Amount, body.Description); err != nil {
+	if err := h.InvestmentService.MakeContribution(ctx, investmentID, accountID, userID, body.Amount, body.Description); err != nil {
 		h.respondError(c, err)
 		return
 	}
@@ -135,8 +148,14 @@ func (h *Handler) MakeWithdraw(c *gin.Context) {
 		return
 	}
 
+	accountID, err := pkg.ParseULID(body.AccountID)
+	if err != nil {
+		h.respondError(c, appErrors.NewValidationError("account_id", "formato invalido"))
+		return
+	}
+
 	ctx := c.Request.Context()
-	if err := h.InvestmentService.MakeWithdraw(ctx, investmentID, userID, body.Amount, body.Description); err != nil {
+	if err := h.InvestmentService.MakeWithdraw(ctx, investmentID, accountID, userID, body.Amount, body.Description); err != nil {
 		h.respondError(c, err)
 		return
 	}

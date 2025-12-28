@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/oklog/ulid/v2"
 )
 
 func (h *Handler) CreateTransaction(c *gin.Context) {
@@ -24,6 +25,12 @@ func (h *Handler) CreateTransaction(c *gin.Context) {
 		return
 	}
 
+	accountID, err := pkg.ParseULID(body.AccountID)
+	if err != nil {
+		h.respondError(c, appErrors.NewValidationError("account_id", "formato inválido"))
+		return
+	}
+
 	categoryID, err := pkg.ParseULID(body.CategoryID)
 	if err != nil {
 		h.respondError(c, appErrors.NewValidationError("category_id", "formato inválido"))
@@ -33,6 +40,7 @@ func (h *Handler) CreateTransaction(c *gin.Context) {
 	transactionEntity := transaction.Transaction{
 		Type:        transaction.Types(body.Type),
 		UserId:      userID,
+		AccountId:   accountID,
 		CategoryId:  categoryID,
 		Amount:      body.Amount,
 		Description: body.Description,
@@ -58,14 +66,28 @@ func (h *Handler) GetTransactions(c *gin.Context) {
 		return
 	}
 
+	accountIDStr := c.Query("account_id")
+	var accountID *ulid.ULID
+	if accountIDStr != "" {
+		parsed, err := pkg.ParseULID(accountIDStr)
+		if err != nil {
+			h.respondError(c, appErrors.NewValidationError("account_id", "formato inválido"))
+			return
+		}
+		accountID = &parsed
+	}
+
+	pagination := h.parsePagination(c)
+
 	ctx := c.Request.Context()
-	transactions, err := h.TransactionService.GetAllTransactions(ctx, userID)
+	transactions, total, err := h.TransactionService.GetAllTransactions(ctx, userID, accountID, pagination)
 	if err != nil {
 		h.respondError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, contracts.TransactionListResponse{Transactions: transactions, Total: len(transactions)})
+	response := pkg.NewPaginatedResponse(transactions, pagination.Page, pagination.Limit, total)
+	c.JSON(http.StatusOK, response)
 }
 
 func (h *Handler) GetTransaction(c *gin.Context) {
@@ -110,6 +132,12 @@ func (h *Handler) UpdateTransaction(c *gin.Context) {
 		return
 	}
 
+	accountID, err := pkg.ParseULID(body.AccountID)
+	if err != nil {
+		h.respondError(c, appErrors.NewValidationError("account_id", "formato inválido"))
+		return
+	}
+
 	categoryID, err := pkg.ParseULID(body.CategoryID)
 	if err != nil {
 		h.respondError(c, appErrors.NewValidationError("category_id", "formato inválido"))
@@ -119,6 +147,7 @@ func (h *Handler) UpdateTransaction(c *gin.Context) {
 	transactionEntity := transaction.Transaction{
 		Id:          transactionID,
 		UserId:      userID,
+		AccountId:   accountID,
 		CategoryId:  categoryID,
 		Amount:      body.Amount,
 		Description: body.Description,

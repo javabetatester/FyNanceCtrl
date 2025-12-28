@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/oklog/ulid/v2"
@@ -44,4 +45,8 @@ func IsEmptyULID(id ulid.ULID) bool {
 
 func SetTimestamps() time.Time {
 	return time.Now()
+}
+
+func ParseInt(s string) (int, error) {
+	return strconv.Atoi(s)
 }

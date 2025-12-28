@@ -46,14 +46,17 @@ func (h *Handler) ListCategories(c *gin.Context) {
 		return
 	}
 
+	pagination := h.parsePagination(c)
+
 	ctx := c.Request.Context()
-	categories, err := h.TransactionService.GetAllCategories(ctx, userID)
+	categories, total, err := h.TransactionService.GetAllCategories(ctx, userID, pagination)
 	if err != nil {
 		h.respondError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, contracts.CategoryListResponse{Categories: categories, Total: len(categories)})
+	response := pkg.NewPaginatedResponse(categories, pagination.Page, pagination.Limit, total)
+	c.JSON(http.StatusOK, response)
 }
 
 func (h *Handler) UpdateCategory(c *gin.Context) {

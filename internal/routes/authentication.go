@@ -7,7 +7,6 @@ import (
 	"Fynance/internal/domain/auth"
 	"Fynance/internal/domain/user"
 	appErrors "Fynance/internal/errors"
-	"Fynance/internal/pkg"
 
 	"github.com/gin-gonic/gin"
 )
@@ -15,7 +14,7 @@ import (
 func (h *Handler) Authenticate(c *gin.Context) {
 	var body contracts.AuthLoginRequest
 	if err := c.ShouldBindJSON(&body); err != nil {
-		h.respondError(c, appErrors.ErrBadRequest.WithError(err))
+		h.respondError(c, appErrors.ParseValidationErrors(err))
 		return
 	}
 
@@ -31,13 +30,7 @@ func (h *Handler) Authenticate(c *gin.Context) {
 		return
 	}
 
-	userID, err := pkg.ParseULID(userEntity.Id)
-	if err != nil {
-		h.respondError(c, appErrors.ErrInternalServer.WithError(err))
-		return
-	}
-
-	token, err := h.JwtService.GenerateToken(ctx, userID)
+	token, err := h.JwtService.GenerateToken(ctx, userEntity.Id)
 	if err != nil {
 		h.respondError(c, appErrors.ErrInternalServer.WithError(err))
 		return
@@ -53,7 +46,7 @@ func (h *Handler) Authenticate(c *gin.Context) {
 func (h *Handler) Registration(c *gin.Context) {
 	var body contracts.AuthRegisterRequest
 	if err := c.ShouldBindJSON(&body); err != nil {
-		h.respondError(c, appErrors.ErrBadRequest.WithError(err))
+		h.respondError(c, appErrors.ParseValidationErrors(err))
 		return
 	}
 

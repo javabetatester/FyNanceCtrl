@@ -1,9 +1,15 @@
 package routes
 
 import (
+	"Fynance/internal/domain/account"
 	"Fynance/internal/domain/auth"
+	"Fynance/internal/domain/budget"
+	"Fynance/internal/domain/creditcard"
+	"Fynance/internal/domain/dashboard"
 	"Fynance/internal/domain/goal"
 	"Fynance/internal/domain/investment"
+	"Fynance/internal/domain/recurring"
+	"Fynance/internal/domain/report"
 	"Fynance/internal/domain/transaction"
 	"Fynance/internal/domain/user"
 	appErrors "Fynance/internal/errors"
@@ -22,6 +28,12 @@ type Handler struct {
 	TransactionService transaction.Service
 	GoalService        goal.Service
 	InvestmentService  investment.Service
+	AccountService     account.Service
+	BudgetService      budget.Service
+	DashboardService   dashboard.Service
+	RecurringService   recurring.Service
+	ReportService      report.Service
+	CreditCardService  creditcard.Service
 }
 
 func (h *Handler) GetUserIDFromContext(c *gin.Context) (ulid.ULID, error) {
@@ -36,6 +48,29 @@ func (h *Handler) GetUserIDFromContext(c *gin.Context) (ulid.ULID, error) {
 	}
 
 	return userID, nil
+}
+
+func (h *Handler) parsePagination(c *gin.Context) *pkg.PaginationParams {
+	page := c.DefaultQuery("page", "1")
+	limit := c.DefaultQuery("limit", "10")
+
+	var pageNum, limitNum int
+	if p, err := pkg.ParseInt(page); err == nil && p > 0 {
+		pageNum = p
+	} else {
+		pageNum = 1
+	}
+
+	if l, err := pkg.ParseInt(limit); err == nil && l > 0 {
+		limitNum = l
+	} else {
+		limitNum = 10
+	}
+
+	return &pkg.PaginationParams{
+		Page:  pageNum,
+		Limit: limitNum,
+	}
 }
 
 func (h *Handler) respondError(c *gin.Context, err error) {
