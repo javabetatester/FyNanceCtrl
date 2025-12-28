@@ -2,8 +2,11 @@ package infrastructure
 
 import (
 	"Fynance/config"
+	"Fynance/internal/domain/account"
+	"Fynance/internal/domain/budget"
 	"Fynance/internal/domain/goal"
 	"Fynance/internal/domain/investment"
+	"Fynance/internal/domain/recurring"
 	"Fynance/internal/domain/transaction"
 	"Fynance/internal/domain/user"
 	"Fynance/internal/logger"
@@ -50,12 +53,20 @@ func NewDb(cfg *config.Config) (*gorm.DB, error) {
 func runMigrations(db *gorm.DB) error {
 	logger.Info().Msg("Executando migrations...")
 
+	if err := removeUniqueConstraintOnUserName(db); err != nil {
+		logger.Warn().Err(err).Msg("Aviso ao remover constraint única do campo name da tabela users")
+	}
+
 	entities := []interface{}{
 		&user.User{},
 		&goal.Goal{},
+		&goal.Contribution{},
 		&transaction.Transaction{},
 		&transaction.Category{},
 		&investment.Investment{},
+		&account.Account{},
+		&budget.Budget{},
+		&recurring.RecurringTransaction{},
 	}
 
 	for _, entity := range entities {
@@ -72,18 +83,78 @@ func runMigrations(db *gorm.DB) error {
 	return nil
 }
 
+func removeUniqueConstraintOnUserName(db *gorm.DB) error {
+	sqlDB, err := db.DB()
+	if err != nil {
+		return err
+	}
+
+	query := `
+		SELECT constraint_name
+		FROM information_schema.table_constraints
+		WHERE table_name = 'users'
+		AND constraint_type = 'UNIQUE'
+		AND constraint_name != 'idx_users_email'
+		AND constraint_name IN (
+			SELECT constraint_name
+			FROM information_schema.key_column_usage
+			WHERE table_name = 'users'
+			AND column_name = 'name'
+		)
+	`
+
+	rows, err := sqlDB.Query(query)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var constraints []string
+	for rows.Next() {
+		var constraintName string
+		if err := rows.Scan(&constraintName); err != nil {
+			continue
+		}
+		constraints = append(constraints, constraintName)
+	}
+
+	for _, constraintName := range constraints {
+		dropQuery := `ALTER TABLE users DROP CONSTRAINT IF EXISTS ` + constraintName
+		if _, err := sqlDB.Exec(dropQuery); err != nil {
+			logger.Warn().
+				Err(err).
+				Str("constraint", constraintName).
+				Msg("Não foi possível remover constraint única do campo name")
+			continue
+		}
+		logger.Info().
+			Str("constraint", constraintName).
+			Msg("Constraint única removida do campo name da tabela users")
+	}
+
+	return nil
+}
+
 func getEntityName(entity interface{}) string {
 	switch entity.(type) {
 	case *user.User:
 		return "User"
 	case *goal.Goal:
 		return "Goal"
+	case *goal.Contribution:
+		return "GoalContribution"
 	case *transaction.Transaction:
 		return "Transaction"
 	case *transaction.Category:
 		return "Category"
 	case *investment.Investment:
 		return "Investment"
+	case *account.Account:
+		return "Account"
+	case *budget.Budget:
+		return "Budget"
+	case *recurring.RecurringTransaction:
+		return "RecurringTransaction"
 	default:
 		return "Unknown"
 	}

@@ -76,38 +76,68 @@ func (r *TransactionCategoryRepository) GetByID(ctx context.Context, categoryID 
 	return toDomainCategory(&row)
 }
 
-func (r *TransactionCategoryRepository) GetAll(ctx context.Context, userID ulid.ULID) ([]*transaction.Category, error) {
+func (r *TransactionCategoryRepository) GetAll(ctx context.Context, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*transaction.Category, int64, error) {
+	if pagination == nil {
+		pagination = &pkg.PaginationParams{Page: 1, Limit: 10}
+	}
+	pagination.Normalize()
+
+	baseQuery := r.DB.WithContext(ctx).Table("categories").Where("user_id = ?", userID.String())
+
+	var total int64
+	if err := baseQuery.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
 	var rows []categoryDB
-	err := r.DB.WithContext(ctx).Table("categories").Where("user_id = ?", userID.String()).Find(&rows).Error
+	err := baseQuery.Order("name ASC").
+		Offset(pagination.Offset()).
+		Limit(pagination.Limit).
+		Find(&rows).Error
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	out := make([]*transaction.Category, 0, len(rows))
 	for i := range rows {
 		c, err := toDomainCategory(&rows[i])
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		out = append(out, c)
 	}
-	return out, nil
+	return out, total, nil
 }
 
-func (r *TransactionCategoryRepository) GetByUserID(ctx context.Context, userID ulid.ULID) ([]*transaction.Category, error) {
+func (r *TransactionCategoryRepository) GetByUserID(ctx context.Context, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*transaction.Category, int64, error) {
+	if pagination == nil {
+		pagination = &pkg.PaginationParams{Page: 1, Limit: 10}
+	}
+	pagination.Normalize()
+
+	baseQuery := r.DB.WithContext(ctx).Table("categories").Where("user_id = ?", userID.String())
+
+	var total int64
+	if err := baseQuery.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
 	var rows []categoryDB
-	err := r.DB.WithContext(ctx).Table("categories").Where("user_id = ?", userID.String()).Find(&rows).Error
+	err := baseQuery.Order("name ASC").
+		Offset(pagination.Offset()).
+		Limit(pagination.Limit).
+		Find(&rows).Error
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	out := make([]*transaction.Category, 0, len(rows))
 	for i := range rows {
 		c, err := toDomainCategory(&rows[i])
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		out = append(out, c)
 	}
-	return out, nil
+	return out, total, nil
 }
 
 func (r *TransactionCategoryRepository) GetByName(ctx context.Context, CategoryName string, userID ulid.ULID) (*transaction.Category, error) {
