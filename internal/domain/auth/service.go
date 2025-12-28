@@ -4,6 +4,7 @@ import (
 	"context"
 	"regexp"
 
+	"Fynance/internal/domain/transaction"
 	"Fynance/internal/domain/user"
 	appErrors "Fynance/internal/errors"
 
@@ -11,8 +12,9 @@ import (
 )
 
 type Service struct {
-	Repository  user.Repository
-	UserService *user.Service
+	Repository         user.Repository
+	UserService        *user.Service
+	CategoryService    *transaction.Service
 }
 
 func (s *Service) Login(ctx context.Context, login Login) (*user.User, error) {
@@ -43,6 +45,8 @@ func (s *Service) Register(ctx context.Context, user *user.User) error {
 	if err := s.UserService.Create(ctx, user); err != nil {
 		return err
 	}
+
+
 	return nil
 }
 
@@ -87,7 +91,7 @@ func PasswordValidate(inputPassword string, storedPassword string) error {
 }
 
 func PasswordHashing(password string) (string, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), 12)
 	if err != nil {
 		return "", appErrors.ErrInternalServer.WithError(err)
 	}

@@ -7,6 +7,7 @@ import (
 )
 
 type TransactionCreateRequest struct {
+	AccountID   string  `json:"account_id" binding:"required"`
 	Type        string  `json:"type" binding:"required,oneof=RECEIPT EXPENSE TRANSFER GOALS INVESTMENT WITHDRAW"`
 	CategoryID  string  `json:"category_id" binding:"required"`
 	Amount      float64 `json:"amount" binding:"required,gt=0"`
@@ -14,6 +15,7 @@ type TransactionCreateRequest struct {
 }
 
 type TransactionUpdateRequest struct {
+	AccountID   string     `json:"account_id" binding:"required"`
 	Type        string     `json:"type" binding:"required,oneof=RECEIPT EXPENSE TRANSFER GOALS INVESTMENT WITHDRAW"`
 	CategoryID  string     `json:"category_id" binding:"required"`
 	Amount      float64    `json:"amount" binding:"required,gt=0"`
