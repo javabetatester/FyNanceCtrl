@@ -6,24 +6,27 @@ import (
 	"testing"
 	"time"
 
+	"Fynance/internal/domain/account"
 	domaincontracts "Fynance/internal/domain/contracts"
 	"Fynance/internal/domain/investment"
 	"Fynance/internal/domain/transaction"
 	"Fynance/internal/domain/user"
 	appErrors "Fynance/internal/errors"
+	"Fynance/internal/pkg"
 
 	"github.com/oklog/ulid/v2"
 )
 
 type fakeInvestmentRepository struct {
-	createFn          func(ctx context.Context, inv *investment.Investment) error
-	updateFn          func(ctx context.Context, inv *investment.Investment) error
-	deleteFn          func(ctx context.Context, id ulid.ULID, userId ulid.ULID) error
-	getByIDFn         func(ctx context.Context, id ulid.ULID, userId ulid.ULID) (*investment.Investment, error)
-	getByUserFn       func(ctx context.Context, userId ulid.ULID) ([]*investment.Investment, error)
-	listFn            func(ctx context.Context, userId ulid.ULID) ([]*investment.Investment, error)
-	getTotalBalanceFn func(ctx context.Context, userId ulid.ULID) (float64, error)
-	getByTypeFn       func(ctx context.Context, userId ulid.ULID, typ investment.Types) ([]*investment.Investment, error)
+	createFn              func(ctx context.Context, inv *investment.Investment) error
+	updateFn              func(ctx context.Context, inv *investment.Investment) error
+	deleteFn              func(ctx context.Context, id ulid.ULID, userId ulid.ULID) error
+	getByIDFn             func(ctx context.Context, id ulid.ULID, userId ulid.ULID) (*investment.Investment, error)
+	getByUserFn           func(ctx context.Context, userId ulid.ULID, pagination *pkg.PaginationParams) ([]*investment.Investment, int64, error)
+	listFn                func(ctx context.Context, userId ulid.ULID, pagination *pkg.PaginationParams) ([]*investment.Investment, int64, error)
+	getTotalBalanceFn     func(ctx context.Context, userId ulid.ULID) (float64, error)
+	getByTypeFn           func(ctx context.Context, userId ulid.ULID, typ investment.Types, pagination *pkg.PaginationParams) ([]*investment.Investment, int64, error)
+	updateBalanceAtomicFn func(ctx context.Context, investmentID ulid.ULID, delta float64) error
 }
 
 func (f *fakeInvestmentRepository) Create(ctx context.Context, inv *investment.Investment) error {
@@ -33,11 +36,11 @@ func (f *fakeInvestmentRepository) Create(ctx context.Context, inv *investment.I
 	return nil
 }
 
-func (f *fakeInvestmentRepository) List(ctx context.Context, userId ulid.ULID) ([]*investment.Investment, error) {
+func (f *fakeInvestmentRepository) List(ctx context.Context, userId ulid.ULID, pagination *pkg.PaginationParams) ([]*investment.Investment, int64, error) {
 	if f.listFn != nil {
-		return f.listFn(ctx, userId)
+		return f.listFn(ctx, userId, pagination)
 	}
-	return nil, nil
+	return nil, 0, nil
 }
 
 func (f *fakeInvestmentRepository) Update(ctx context.Context, inv *investment.Investment) error {
@@ -61,11 +64,11 @@ func (f *fakeInvestmentRepository) GetInvestmentById(ctx context.Context, id uli
 	return nil, nil
 }
 
-func (f *fakeInvestmentRepository) GetByUserId(ctx context.Context, userId ulid.ULID) ([]*investment.Investment, error) {
+func (f *fakeInvestmentRepository) GetByUserId(ctx context.Context, userId ulid.ULID, pagination *pkg.PaginationParams) ([]*investment.Investment, int64, error) {
 	if f.getByUserFn != nil {
-		return f.getByUserFn(ctx, userId)
+		return f.getByUserFn(ctx, userId, pagination)
 	}
-	return nil, nil
+	return nil, 0, nil
 }
 
 func (f *fakeInvestmentRepository) GetTotalBalance(ctx context.Context, userId ulid.ULID) (float64, error) {
@@ -75,11 +78,26 @@ func (f *fakeInvestmentRepository) GetTotalBalance(ctx context.Context, userId u
 	return 0, nil
 }
 
-func (f *fakeInvestmentRepository) GetByType(ctx context.Context, userId ulid.ULID, typ investment.Types) ([]*investment.Investment, error) {
+func (f *fakeInvestmentRepository) GetByType(ctx context.Context, userId ulid.ULID, typ investment.Types, pagination *pkg.PaginationParams) ([]*investment.Investment, int64, error) {
 	if f.getByTypeFn != nil {
-		return f.getByTypeFn(ctx, userId, typ)
+		return f.getByTypeFn(ctx, userId, typ, pagination)
 	}
-	return nil, nil
+	return nil, 0, nil
+}
+
+func (f *fakeInvestmentRepository) UpdateBalanceAtomic(ctx context.Context, investmentID ulid.ULID, delta float64) error {
+	if f.updateBalanceAtomicFn != nil {
+		return f.updateBalanceAtomicFn(ctx, investmentID, delta)
+	}
+	if f.updateFn != nil && f.getByIDFn != nil {
+		inv, err := f.getByIDFn(ctx, investmentID, ulid.ULID{})
+		if err != nil || inv == nil {
+			return nil
+		}
+		inv.CurrentBalance += delta
+		return f.updateFn(ctx, inv)
+	}
+	return nil
 }
 
 type fakeTransactionRepository struct {
@@ -100,39 +118,66 @@ func (f *fakeTransactionRepository) Delete(ctx context.Context, id ulid.ULID) er
 func (f *fakeTransactionRepository) GetByID(ctx context.Context, id ulid.ULID) (*transaction.Transaction, error) {
 	return nil, nil
 }
-func (f *fakeTransactionRepository) GetAll(ctx context.Context, userId ulid.ULID) ([]*transaction.Transaction, error) {
+func (f *fakeTransactionRepository) GetByIDAndUser(ctx context.Context, transactionID, userID ulid.ULID) (*transaction.Transaction, error) {
 	return nil, nil
 }
-func (f *fakeTransactionRepository) GetByAmount(ctx context.Context, amount float64) ([]*transaction.Transaction, error) {
-	return nil, nil
+func (f *fakeTransactionRepository) GetAll(ctx context.Context, userId ulid.ULID, accountID *ulid.ULID, pagination *pkg.PaginationParams) ([]*transaction.Transaction, int64, error) {
+	return nil, 0, nil
 }
-func (f *fakeTransactionRepository) GetByName(ctx context.Context, name string) ([]*transaction.Transaction, error) {
-	return nil, nil
+func (f *fakeTransactionRepository) GetByAmount(ctx context.Context, amount float64, pagination *pkg.PaginationParams) ([]*transaction.Transaction, int64, error) {
+	return nil, 0, nil
 }
-func (f *fakeTransactionRepository) GetByCategory(ctx context.Context, categoryID ulid.ULID, userId ulid.ULID) ([]*transaction.Transaction, error) {
-	return nil, nil
+func (f *fakeTransactionRepository) GetByName(ctx context.Context, name string, pagination *pkg.PaginationParams) ([]*transaction.Transaction, int64, error) {
+	return nil, 0, nil
 }
-func (f *fakeTransactionRepository) GetByInvestmentId(ctx context.Context, investmentID ulid.ULID, userId ulid.ULID) ([]*transaction.Transaction, error) {
-	return nil, nil
+func (f *fakeTransactionRepository) GetByCategory(ctx context.Context, categoryID ulid.ULID, userId ulid.ULID, pagination *pkg.PaginationParams) ([]*transaction.Transaction, int64, error) {
+	return nil, 0, nil
+}
+func (f *fakeTransactionRepository) GetByInvestmentId(ctx context.Context, investmentID ulid.ULID, userId ulid.ULID, pagination *pkg.PaginationParams) ([]*transaction.Transaction, int64, error) {
+	return nil, 0, nil
 }
 func (f *fakeTransactionRepository) GetNumberOfTransactions(ctx context.Context, userId ulid.ULID) (int64, error) {
 	return 0, nil
 }
 
 type fakeUserRepo struct {
-	getByIDFn func(ctx context.Context, id string) (*user.User, error)
+	getByIDFn func(ctx context.Context, id ulid.ULID) (*user.User, error)
 }
 
 func (f *fakeUserRepo) Create(ctx context.Context, _ *user.User) error               { return nil }
 func (f *fakeUserRepo) Update(ctx context.Context, _ *user.User) error               { return nil }
-func (f *fakeUserRepo) Delete(ctx context.Context, _ string) error                   { return nil }
+func (f *fakeUserRepo) Delete(ctx context.Context, _ ulid.ULID) error { return nil }
 func (f *fakeUserRepo) GetByEmail(ctx context.Context, _ string) (*user.User, error) { return nil, nil }
 func (f *fakeUserRepo) GetPlan(ctx context.Context, _ ulid.ULID) (user.Plan, error)  { return "", nil }
-func (f *fakeUserRepo) GetById(ctx context.Context, id string) (*user.User, error) {
+func (f *fakeUserRepo) GetById(ctx context.Context, id ulid.ULID) (*user.User, error) {
 	if f.getByIDFn != nil {
 		return f.getByIDFn(ctx, id)
 	}
 	return &user.User{Id: id}, nil
+}
+
+type fakeAccountService struct {
+	getByIDFn       func(ctx context.Context, accountID, userID ulid.ULID) (*account.Account, error)
+	updateBalanceFn func(ctx context.Context, accountID, userID ulid.ULID, amount float64) error
+}
+
+func (f *fakeAccountService) GetAccountByID(ctx context.Context, accountID, userID ulid.ULID) (*account.Account, error) {
+	if f.getByIDFn != nil {
+		return f.getByIDFn(ctx, accountID, userID)
+	}
+	return &account.Account{
+		Id:      accountID,
+		UserId:  userID,
+		Type:    account.TypeChecking,
+		Balance: 1000,
+	}, nil
+}
+
+func (f *fakeAccountService) UpdateBalance(ctx context.Context, accountID, userID ulid.ULID, amount float64) error {
+	if f.updateBalanceFn != nil {
+		return f.updateBalanceFn(ctx, accountID, userID, amount)
+	}
+	return nil
 }
 
 func TestServiceMakeContributionValidations(t *testing.T) {
@@ -181,15 +226,17 @@ func TestServiceMakeContributionValidations(t *testing.T) {
 				},
 			}
 
+			accountID := ulid.Make()
 			svc := investment.Service{
 				Repository:      repo,
 				TransactionRepo: &fakeTransactionRepository{},
 				UserService: &user.Service{
 					Repository: &fakeUserRepo{},
 				},
+				AccountService: &fakeAccountService{},
 			}
 
-			err := svc.MakeContribution(ctx, investmentID, userID, tt.amount, "aporte")
+			err := svc.MakeContribution(ctx, investmentID, accountID, userID, tt.amount, "aporte")
 			if tt.wantErrCode == "" {
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
@@ -230,7 +277,8 @@ func TestServiceMakeContributionValidations(t *testing.T) {
 			},
 		}
 
-		err := svc.MakeContribution(ctx, investmentID, userID, 50, "aporte")
+		accountID := ulid.Make()
+		err := svc.MakeContribution(ctx, investmentID, accountID, userID, 50, "aporte")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -264,10 +312,13 @@ func TestServiceMakeWithdrawValidations(t *testing.T) {
 		UserService: &user.Service{
 			Repository: &fakeUserRepo{},
 		},
+		AccountService: &fakeAccountService{},
 	}
 
+	accountID := ulid.Make()
+
 	t.Run("amount must be positive", func(t *testing.T) {
-		err := svc.MakeWithdraw(ctx, investmentID, userID, 0, "resgate")
+		err := svc.MakeWithdraw(ctx, investmentID, accountID, userID, 0, "resgate")
 		if err == nil {
 			t.Fatalf("expected error")
 		}
@@ -278,7 +329,7 @@ func TestServiceMakeWithdrawValidations(t *testing.T) {
 	})
 
 	t.Run("insufficient balance", func(t *testing.T) {
-		err := svc.MakeWithdraw(ctx, investmentID, userID, 200, "resgate")
+		err := svc.MakeWithdraw(ctx, investmentID, accountID, userID, 200, "resgate")
 		if err == nil {
 			t.Fatalf("expected error")
 		}
