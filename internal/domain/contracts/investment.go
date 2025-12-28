@@ -4,6 +4,7 @@ import "github.com/oklog/ulid/v2"
 
 type CreateInvestmentRequest struct {
 	UserId        ulid.ULID `json:"user_id"`
+	AccountId     ulid.ULID `json:"account_id"`
 	Type          string    `json:"type"`
 	Name          string    `json:"name"`
 	InitialAmount float64   `json:"initial_amount"`
@@ -12,6 +13,7 @@ type CreateInvestmentRequest struct {
 
 type ContributionRequest struct {
 	UserId      ulid.ULID `json:"user_id"`
+	AccountId   ulid.ULID `json:"account_id"`
 	Id          ulid.ULID `json:"id"`
 	Amount      float64   `json:"amount"`
 	Description string    `json:"description"`
