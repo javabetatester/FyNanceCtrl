@@ -1,0 +1,2491 @@
+{
+	"_type": "export",
+	"__export_format": 4,
+	"__export_date": "2025-12-27T00:00:00.000Z",
+	"__export_source": "insomnia.desktop.app:v2023.5.8",
+	"resources": [
+		{
+			"_id": "wrk_fynance",
+			"parentId": null,
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Fynance API",
+			"description": "API de Gestao Financeira Pessoal",
+			"scope": "collection",
+			"_type": "workspace"
+		},
+		{
+			"_id": "env_base",
+			"parentId": "wrk_fynance",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Base Environment",
+			"data": {
+				"base_url": "http://localhost:8080",
+				"token": "COLE_O_TOKEN_AQUI_APOS_LOGIN",
+				"category_id": "",
+				"transaction_id": "",
+				"goal_id": "",
+				"investment_id": "",
+				"account_id": "",
+				"budget_id": "",
+				"recurring_id": "",
+				"credit_card_id": "",
+				"invoice_id": ""
+			},
+			"dataPropertyOrder": {
+				"&": ["base_url", "token", "category_id", "transaction_id", "goal_id", "investment_id", "account_id", "budget_id", "recurring_id", "credit_card_id", "invoice_id"]
+			},
+			"color": null,
+			"isPrivate": false,
+			"metaSortKey": 1735257600000,
+			"_type": "environment"
+		},
+		{
+			"_id": "fld_auth",
+			"parentId": "wrk_fynance",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "1 - Autenticacao",
+			"description": "",
+			"environment": {},
+			"environmentPropertyOrder": null,
+			"metaSortKey": -1000000000000,
+			"_type": "request_group"
+		},
+		{
+			"_id": "req_register",
+			"parentId": "fld_auth",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Registrar Usuario",
+			"description": "",
+			"url": "{{ _.base_url }}/api/auth/register",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"name\": \"Joao Silva\",\n  \"email\": \"joao@example.com\",\n  \"password\": \"Senha123!@#\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -1000000000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_login",
+			"parentId": "fld_auth",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Login - Copie o token da resposta",
+			"description": "Apos executar, copie o token da resposta e cole em Manage Environments > token",
+			"url": "{{ _.base_url }}/api/auth/login",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"email\": \"joao@example.com\",\n  \"password\": \"Senha123!@#\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -999999000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "fld_dashboard",
+			"parentId": "wrk_fynance",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "2 - Dashboard",
+			"description": "",
+			"environment": {},
+			"environmentPropertyOrder": null,
+			"metaSortKey": -900000000000,
+			"_type": "request_group"
+		},
+		{
+			"_id": "req_dashboard",
+			"parentId": "fld_dashboard",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Obter Dashboard",
+			"description": "",
+			"url": "{{ _.base_url }}/api/dashboard",
+			"method": "GET",
+			"body": {},
+			"parameters": [
+				{
+					"name": "month",
+					"value": "12",
+					"disabled": false
+				},
+				{
+					"name": "year",
+					"value": "2025",
+					"disabled": false
+				}
+			],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -900000000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "fld_users",
+			"parentId": "wrk_fynance",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "3 - Usuarios",
+			"description": "",
+			"environment": {},
+			"environmentPropertyOrder": null,
+			"metaSortKey": -800000000000,
+			"_type": "request_group"
+		},
+		{
+			"_id": "req_user_plan",
+			"parentId": "fld_users",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Consultar Plano",
+			"description": "",
+			"url": "{{ _.base_url }}/api/users/plan",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -800000000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "fld_categories",
+			"parentId": "wrk_fynance",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "4 - Categorias (para Transacoes)",
+			"description": "Crie categorias antes de usar em transacoes, investimentos, orcamentos e recorrentes",
+			"environment": {},
+			"environmentPropertyOrder": null,
+			"metaSortKey": -700000000000,
+			"_type": "request_group"
+		},
+		{
+			"_id": "req_category_create_expense",
+			"parentId": "fld_categories",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Criar Categoria - Despesa (EXPENSE)",
+			"description": "Para transacoes tipo EXPENSE",
+			"url": "{{ _.base_url }}/api/categories",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"name\": \"Alimentacao\",\n  \"icon\": \"food\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				},
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -700000000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_category_create_receipt",
+			"parentId": "fld_categories",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Criar Categoria - Receita (RECEIPT)",
+			"description": "Para transacoes tipo RECEIPT",
+			"url": "{{ _.base_url }}/api/categories",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"name\": \"Salario\",\n  \"icon\": \"money\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				},
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -699999500000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_category_create_investment",
+			"parentId": "fld_categories",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Criar Categoria - Investimento",
+			"description": "Para investimentos, aportes e resgates",
+			"url": "{{ _.base_url }}/api/categories",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"name\": \"Investimentos\",\n  \"icon\": \"chart\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				},
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -699999000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_category_create",
+			"parentId": "fld_categories",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Criar Categoria - Generica",
+			"description": "Categoria generica para qualquer tipo de transacao",
+			"url": "{{ _.base_url }}/api/categories",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"name\": \"Outros\",\n  \"icon\": \"tag\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				},
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -700000000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_category_list",
+			"parentId": "fld_categories",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Listar Categorias",
+			"description": "",
+			"url": "{{ _.base_url }}/api/categories",
+			"method": "GET",
+			"body": {},
+			"parameters": [
+				{
+					"name": "page",
+					"value": "1",
+					"disabled": false,
+					"description": "Numero da pagina (padrao: 1)"
+				},
+				{
+					"name": "limit",
+					"value": "10",
+					"disabled": false,
+					"description": "Itens por pagina (padrao: 10, max: 100)"
+				}
+			],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -699999000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_category_update",
+			"parentId": "fld_categories",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Atualizar Categoria",
+			"description": "",
+			"url": "{{ _.base_url }}/api/categories/{{ _.category_id }}",
+			"method": "PATCH",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"name\": \"Alimentacao e Bebidas\",\n  \"icon\": \"food\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				},
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -699998000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_category_delete",
+			"parentId": "fld_categories",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Deletar Categoria",
+			"description": "",
+			"url": "{{ _.base_url }}/api/categories/{{ _.category_id }}",
+			"method": "DELETE",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -699997000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "fld_transactions",
+			"parentId": "wrk_fynance",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "5 - Transacoes",
+			"description": "",
+			"environment": {},
+			"environmentPropertyOrder": null,
+			"metaSortKey": -600000000000,
+			"_type": "request_group"
+		},
+		{
+			"_id": "req_transaction_create",
+			"parentId": "fld_transactions",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Criar Transacao",
+			"description": "",
+			"url": "{{ _.base_url }}/api/transactions",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"account_id\": \"{{ _.account_id }}\",\n  \"type\": \"EXPENSE\",\n  \"category_id\": \"{{ _.category_id }}\",\n  \"amount\": 150.50,\n  \"description\": \"Compra no supermercado\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				},
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -600000000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_transaction_list",
+			"parentId": "fld_transactions",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Listar Transacoes",
+			"description": "account_id opcional - filtra por conta especifica",
+			"url": "{{ _.base_url }}/api/transactions",
+			"method": "GET",
+			"body": {},
+			"parameters": [
+				{
+					"name": "account_id",
+					"value": "",
+					"disabled": true,
+					"description": "Opcional - filtra por conta especifica. Se vazio, exibe todas as transacoes"
+				},
+				{
+					"name": "page",
+					"value": "1",
+					"disabled": false,
+					"description": "Numero da pagina (padrao: 1)"
+				},
+				{
+					"name": "limit",
+					"value": "10",
+					"disabled": false,
+					"description": "Itens por pagina (padrao: 10, max: 100)"
+				}
+			],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -599999000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_transaction_get",
+			"parentId": "fld_transactions",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Obter Transacao",
+			"description": "",
+			"url": "{{ _.base_url }}/api/transactions/{{ _.transaction_id }}",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -599998000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_transaction_update",
+			"parentId": "fld_transactions",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Atualizar Transacao",
+			"description": "",
+			"url": "{{ _.base_url }}/api/transactions/{{ _.transaction_id }}",
+			"method": "PATCH",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"account_id\": \"{{ _.account_id }}\",\n  \"type\": \"EXPENSE\",\n  \"category_id\": \"{{ _.category_id }}\",\n  \"amount\": 200.00,\n  \"description\": \"Compra atualizada\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				},
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -599997000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_transaction_delete",
+			"parentId": "fld_transactions",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Deletar Transacao",
+			"description": "",
+			"url": "{{ _.base_url }}/api/transactions/{{ _.transaction_id }}",
+			"method": "DELETE",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -599996000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "fld_accounts",
+			"parentId": "wrk_fynance",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "6 - Contas",
+			"description": "",
+			"environment": {},
+			"environmentPropertyOrder": null,
+			"metaSortKey": -500000000000,
+			"_type": "request_group"
+		},
+		{
+			"_id": "req_account_create",
+			"parentId": "fld_accounts",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Criar Conta",
+			"description": "",
+			"url": "{{ _.base_url }}/api/accounts",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"name\": \"Conta Corrente Nubank\",\n  \"type\": \"CHECKING\",\n  \"initial_balance\": 1000.00,\n  \"color\": \"#8B5CF6\",\n  \"icon\": \"bank\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				},
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -500000000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_account_list",
+			"parentId": "fld_accounts",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Listar Contas",
+			"description": "",
+			"url": "{{ _.base_url }}/api/accounts",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -499999000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_account_balance",
+			"parentId": "fld_accounts",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Saldo Total",
+			"description": "",
+			"url": "{{ _.base_url }}/api/accounts/balance",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -499998000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_account_get",
+			"parentId": "fld_accounts",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Obter Conta",
+			"description": "",
+			"url": "{{ _.base_url }}/api/accounts/{{ _.account_id }}",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -499997000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_account_update",
+			"parentId": "fld_accounts",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Atualizar Conta",
+			"description": "",
+			"url": "{{ _.base_url }}/api/accounts/{{ _.account_id }}",
+			"method": "PATCH",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"name\": \"Conta Corrente Nubank (atualizada)\",\n  \"color\": \"#10B981\",\n  \"icon\": \"wallet\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				},
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -499996000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_account_delete",
+			"parentId": "fld_accounts",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Deletar Conta",
+			"description": "",
+			"url": "{{ _.base_url }}/api/accounts/{{ _.account_id }}",
+			"method": "DELETE",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -499995000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_account_transfer",
+			"parentId": "fld_accounts",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Transferir entre Contas",
+			"description": "",
+			"url": "{{ _.base_url }}/api/accounts/transfer",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"from_account_id\": \"{{ _.account_id }}\",\n  \"to_account_id\": \"COLE_ID_DESTINO_AQUI\",\n  \"amount\": 500.00,\n  \"description\": \"Transferencia\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				},
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -499994000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "fld_goals",
+			"parentId": "wrk_fynance",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "7 - Metas",
+			"description": "",
+			"environment": {},
+			"environmentPropertyOrder": null,
+			"metaSortKey": -400000000000,
+			"_type": "request_group"
+		},
+		{
+			"_id": "req_goal_create",
+			"parentId": "fld_goals",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Criar Meta",
+			"description": "",
+			"url": "{{ _.base_url }}/api/goals",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"name\": \"Viagem para Europa\",\n  \"target\": 10000.00,\n  \"end_at\": \"2025-12-31T00:00:00Z\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				},
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -400000000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_goal_list",
+			"parentId": "fld_goals",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Listar Metas",
+			"description": "",
+			"url": "{{ _.base_url }}/api/goals",
+			"method": "GET",
+			"body": {},
+			"parameters": [
+				{
+					"name": "page",
+					"value": "1",
+					"disabled": false,
+					"description": "Numero da pagina (padrao: 1)"
+				},
+				{
+					"name": "limit",
+					"value": "10",
+					"disabled": false,
+					"description": "Itens por pagina (padrao: 10, max: 100)"
+				}
+			],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -399999000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_goal_get",
+			"parentId": "fld_goals",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Obter Meta",
+			"description": "",
+			"url": "{{ _.base_url }}/api/goals/{{ _.goal_id }}",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -399998000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_goal_update",
+			"parentId": "fld_goals",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Atualizar Meta",
+			"description": "",
+			"url": "{{ _.base_url }}/api/goals/{{ _.goal_id }}",
+			"method": "PATCH",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"name\": \"Viagem Europa (atualizada)\",\n  \"target\": 12000.00,\n  \"end_at\": \"2026-06-30T00:00:00Z\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				},
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -399997000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_goal_delete",
+			"parentId": "fld_goals",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Deletar Meta",
+			"description": "",
+			"url": "{{ _.base_url }}/api/goals/{{ _.goal_id }}",
+			"method": "DELETE",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -399996000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_goal_contribute",
+			"parentId": "fld_goals",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Contribuir para Meta",
+			"description": "",
+			"url": "{{ _.base_url }}/api/goals/{{ _.goal_id }}/contribution",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"amount\": 500.00,\n  \"description\": \"Deposito mensal\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				},
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -399995000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_goal_withdraw",
+			"parentId": "fld_goals",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Retirar da Meta",
+			"description": "",
+			"url": "{{ _.base_url }}/api/goals/{{ _.goal_id }}/withdraw",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"amount\": 200.00,\n  \"description\": \"Emergencia\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				},
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -399994000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_goal_contributions",
+			"parentId": "fld_goals",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Listar Contribuicoes",
+			"description": "",
+			"url": "{{ _.base_url }}/api/goals/{{ _.goal_id }}/contributions",
+			"method": "GET",
+			"body": {},
+			"parameters": [
+				{
+					"name": "page",
+					"value": "1",
+					"disabled": false,
+					"description": "Numero da pagina (padrao: 1)"
+				},
+				{
+					"name": "limit",
+					"value": "10",
+					"disabled": false,
+					"description": "Itens por pagina (padrao: 10, max: 100)"
+				}
+			],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -399993000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_goal_progress",
+			"parentId": "fld_goals",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Progresso da Meta",
+			"description": "",
+			"url": "{{ _.base_url }}/api/goals/{{ _.goal_id }}/progress",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -399992000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "fld_investments",
+			"parentId": "wrk_fynance",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "8 - Investimentos",
+			"description": "",
+			"environment": {},
+			"environmentPropertyOrder": null,
+			"metaSortKey": -300000000000,
+			"_type": "request_group"
+		},
+		{
+			"_id": "req_investment_create",
+			"parentId": "fld_investments",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Criar Investimento",
+			"description": "",
+			"url": "{{ _.base_url }}/api/investments",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"account_id\": \"{{ _.account_id }}\",\n  \"type\": \"CDB\",\n  \"name\": \"CDB Banco XYZ\",\n  \"initial_amount\": 5000.00,\n  \"return_rate\": 12.5,\n  \"category_id\": \"{{ _.category_id }}\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				},
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -300000000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_investment_list",
+			"parentId": "fld_investments",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Listar Investimentos",
+			"description": "",
+			"url": "{{ _.base_url }}/api/investments",
+			"method": "GET",
+			"body": {},
+			"parameters": [
+				{
+					"name": "page",
+					"value": "1",
+					"disabled": false,
+					"description": "Numero da pagina (padrao: 1)"
+				},
+				{
+					"name": "limit",
+					"value": "10",
+					"disabled": false,
+					"description": "Itens por pagina (padrao: 10, max: 100)"
+				}
+			],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -299999000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_investment_get",
+			"parentId": "fld_investments",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Obter Investimento",
+			"description": "",
+			"url": "{{ _.base_url }}/api/investments/{{ _.investment_id }}",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -299998000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_investment_update",
+			"parentId": "fld_investments",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Atualizar Investimento",
+			"description": "",
+			"url": "{{ _.base_url }}/api/investments/{{ _.investment_id }}",
+			"method": "PATCH",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"name\": \"CDB Banco XYZ (atualizado)\",\n  \"return_rate\": 13.0\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				},
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -299997000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_investment_delete",
+			"parentId": "fld_investments",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Deletar Investimento",
+			"description": "",
+			"url": "{{ _.base_url }}/api/investments/{{ _.investment_id }}",
+			"method": "DELETE",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -299996000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_investment_contribution",
+			"parentId": "fld_investments",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Fazer Aporte",
+			"description": "account_id e category_id obrigatorios - use categoria de investimento",
+			"url": "{{ _.base_url }}/api/investments/{{ _.investment_id }}/contribution",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"account_id\": \"{{ _.account_id }}\",\n  \"amount\": 1000.00,\n  \"category_id\": \"{{ _.category_id }}\",\n  \"description\": \"Aporte mensal\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				},
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -299995000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_investment_withdraw",
+			"parentId": "fld_investments",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Fazer Resgate",
+			"description": "account_id e category_id obrigatorios - use categoria de investimento",
+			"url": "{{ _.base_url }}/api/investments/{{ _.investment_id }}/withdraw",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"account_id\": \"{{ _.account_id }}\",\n  \"amount\": 500.00,\n  \"category_id\": \"{{ _.category_id }}\",\n  \"description\": \"Resgate parcial\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				},
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -299994000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_investment_return",
+			"parentId": "fld_investments",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Calcular Retorno",
+			"description": "",
+			"url": "{{ _.base_url }}/api/investments/{{ _.investment_id }}/return",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -299993000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "fld_budgets",
+			"parentId": "wrk_fynance",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "9 - Orcamentos",
+			"description": "",
+			"environment": {},
+			"environmentPropertyOrder": null,
+			"metaSortKey": -200000000000,
+			"_type": "request_group"
+		},
+		{
+			"_id": "req_budget_create",
+			"parentId": "fld_budgets",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Criar Orcamento",
+			"description": "",
+			"url": "{{ _.base_url }}/api/budgets",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"category_id\": \"{{ _.category_id }}\",\n  \"amount\": 2000.00,\n  \"month\": 12,\n  \"year\": 2025,\n  \"alert_at\": 80.0,\n  \"is_recurring\": true\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				},
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -200000000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_budget_list",
+			"parentId": "fld_budgets",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Listar Orcamentos",
+			"description": "",
+			"url": "{{ _.base_url }}/api/budgets",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -199999000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_budget_summary",
+			"parentId": "fld_budgets",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Resumo de Orcamentos",
+			"description": "",
+			"url": "{{ _.base_url }}/api/budgets/summary",
+			"method": "GET",
+			"body": {},
+			"parameters": [
+				{
+					"name": "month",
+					"value": "12",
+					"disabled": false
+				},
+				{
+					"name": "year",
+					"value": "2025",
+					"disabled": false
+				}
+			],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -199998000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_budget_get",
+			"parentId": "fld_budgets",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Obter Orcamento",
+			"description": "",
+			"url": "{{ _.base_url }}/api/budgets/{{ _.budget_id }}",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -199997000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_budget_status",
+			"parentId": "fld_budgets",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Status do Orcamento",
+			"description": "",
+			"url": "{{ _.base_url }}/api/budgets/{{ _.budget_id }}/status",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -199996000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_budget_update",
+			"parentId": "fld_budgets",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Atualizar Orcamento",
+			"description": "",
+			"url": "{{ _.base_url }}/api/budgets/{{ _.budget_id }}",
+			"method": "PATCH",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"amount\": 2500.00,\n  \"alert_at\": 85.0,\n  \"is_recurring\": false\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				},
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -199995000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_budget_delete",
+			"parentId": "fld_budgets",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Deletar Orcamento",
+			"description": "",
+			"url": "{{ _.base_url }}/api/budgets/{{ _.budget_id }}",
+			"method": "DELETE",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -199994000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "fld_recurring",
+			"parentId": "wrk_fynance",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "10 - Recorrentes",
+			"description": "",
+			"environment": {},
+			"environmentPropertyOrder": null,
+			"metaSortKey": -100000000000,
+			"_type": "request_group"
+		},
+		{
+			"_id": "req_recurring_create",
+			"parentId": "fld_recurring",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Criar Recorrente",
+			"description": "Tipo: RECEIPT ou EXPENSE. category_id obrigatorio",
+			"url": "{{ _.base_url }}/api/recurring",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"type\": \"EXPENSE\",\n  \"category_id\": \"{{ _.category_id }}\",\n  \"account_id\": \"{{ _.account_id }}\",\n  \"amount\": 1500.00,\n  \"description\": \"Aluguel\",\n  \"frequency\": \"MONTHLY\",\n  \"day_of_month\": 5,\n  \"start_date\": \"2025-01-05T00:00:00Z\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				},
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -100000000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_recurring_list",
+			"parentId": "fld_recurring",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Listar Recorrentes",
+			"description": "",
+			"url": "{{ _.base_url }}/api/recurring",
+			"method": "GET",
+			"body": {},
+			"parameters": [
+				{
+					"name": "page",
+					"value": "1",
+					"disabled": false,
+					"description": "Numero da pagina (padrao: 1)"
+				},
+				{
+					"name": "limit",
+					"value": "10",
+					"disabled": false,
+					"description": "Itens por pagina (padrao: 10, max: 100)"
+				}
+			],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -99999000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_recurring_get",
+			"parentId": "fld_recurring",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Obter Recorrente",
+			"description": "",
+			"url": "{{ _.base_url }}/api/recurring/{{ _.recurring_id }}",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -99998000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_recurring_update",
+			"parentId": "fld_recurring",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Atualizar Recorrente",
+			"description": "",
+			"url": "{{ _.base_url }}/api/recurring/{{ _.recurring_id }}",
+			"method": "PATCH",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"amount\": 1600.00,\n  \"description\": \"Aluguel atualizado\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				},
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -99997000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_recurring_delete",
+			"parentId": "fld_recurring",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Deletar Recorrente",
+			"description": "",
+			"url": "{{ _.base_url }}/api/recurring/{{ _.recurring_id }}",
+			"method": "DELETE",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -99996000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_recurring_pause",
+			"parentId": "fld_recurring",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Pausar Recorrente",
+			"description": "",
+			"url": "{{ _.base_url }}/api/recurring/{{ _.recurring_id }}/pause",
+			"method": "POST",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -99995000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_recurring_resume",
+			"parentId": "fld_recurring",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Retomar Recorrente",
+			"description": "",
+			"url": "{{ _.base_url }}/api/recurring/{{ _.recurring_id }}/resume",
+			"method": "POST",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -99994000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_recurring_process",
+			"parentId": "fld_recurring",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Processar Manualmente",
+			"description": "",
+			"url": "{{ _.base_url }}/api/recurring/{{ _.recurring_id }}/process",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"process_date\": \"2025-01-01T00:00:00Z\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				},
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -99993000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "fld_credit_cards",
+			"parentId": "wrk_fynance",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "11 - Cartoes de Credito",
+			"description": "",
+			"environment": {},
+			"environmentPropertyOrder": null,
+			"metaSortKey": -50000000000,
+			"_type": "request_group"
+		},
+		{
+			"_id": "req_credit_card_create",
+			"parentId": "fld_credit_cards",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Criar Cartao de Credito",
+			"description": "account_id deve ser uma conta do tipo CREDIT_CARD",
+			"url": "{{ _.base_url }}/api/credit-cards",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"account_id\": \"{{ _.account_id }}\",\n  \"name\": \"Nubank Visa\",\n  \"credit_limit\": 5000.00,\n  \"closing_day\": 10,\n  \"due_day\": 15,\n  \"brand\": \"VISA\",\n  \"last_four_digits\": \"1234\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				},
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -50000000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_credit_card_list",
+			"parentId": "fld_credit_cards",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Listar Cartoes",
+			"description": "",
+			"url": "{{ _.base_url }}/api/credit-cards",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -49999000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_credit_card_get",
+			"parentId": "fld_credit_cards",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Obter Cartao",
+			"description": "",
+			"url": "{{ _.base_url }}/api/credit-cards/{{ _.credit_card_id }}",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -49998000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_credit_card_update",
+			"parentId": "fld_credit_cards",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Atualizar Cartao",
+			"description": "",
+			"url": "{{ _.base_url }}/api/credit-cards/{{ _.credit_card_id }}",
+			"method": "PATCH",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"name\": \"Nubank Visa (atualizado)\",\n  \"credit_limit\": 6000.00\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				},
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -49997000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_credit_card_delete",
+			"parentId": "fld_credit_cards",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Deletar Cartao",
+			"description": "",
+			"url": "{{ _.base_url }}/api/credit-cards/{{ _.credit_card_id }}",
+			"method": "DELETE",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -49996000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_credit_card_invoices",
+			"parentId": "fld_credit_cards",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Listar Faturas",
+			"description": "",
+			"url": "{{ _.base_url }}/api/credit-cards/{{ _.credit_card_id }}/invoices",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -49995000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_credit_card_current_invoice",
+			"parentId": "fld_credit_cards",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Fatura Atual",
+			"description": "",
+			"url": "{{ _.base_url }}/api/credit-cards/{{ _.credit_card_id }}/invoices/current",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -49994000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_credit_card_invoice_get",
+			"parentId": "fld_credit_cards",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Obter Fatura",
+			"description": "",
+			"url": "{{ _.base_url }}/api/credit-cards/{{ _.credit_card_id }}/invoices/{{ _.invoice_id }}",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -49993000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_credit_card_invoice_pay",
+			"parentId": "fld_credit_cards",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Pagar Fatura",
+			"description": "account_id deve ser conta bancaria (nao pode ser cartao)",
+			"url": "{{ _.base_url }}/api/credit-cards/{{ _.credit_card_id }}/invoices/{{ _.invoice_id }}/pay",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"account_id\": \"{{ _.account_id }}\",\n  \"amount\": 1500.00\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				},
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -49992000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_credit_card_transaction_create",
+			"parentId": "fld_credit_cards",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Registrar Gasto no Cartao",
+			"description": "",
+			"url": "{{ _.base_url }}/api/credit-cards/{{ _.credit_card_id }}/transactions",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"category_id\": \"{{ _.category_id }}\",\n  \"amount\": 250.00,\n  \"description\": \"Compra no supermercado\",\n  \"date\": \"2025-12-27T00:00:00Z\",\n  \"installments\": 1,\n  \"is_recurring\": false\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				},
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -49991000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_credit_card_transactions",
+			"parentId": "fld_credit_cards",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Listar Gastos do Cartao",
+			"description": "",
+			"url": "{{ _.base_url }}/api/credit-cards/{{ _.credit_card_id }}/transactions",
+			"method": "GET",
+			"body": {},
+			"parameters": [
+				{
+					"name": "page",
+					"value": "1",
+					"disabled": false,
+					"description": "Numero da pagina (padrao: 1)"
+				},
+				{
+					"name": "limit",
+					"value": "10",
+					"disabled": false,
+					"description": "Itens por pagina (padrao: 10, max: 100)"
+				}
+			],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -49990000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "fld_reports",
+			"parentId": "wrk_fynance",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "12 - Relatorios (BASIC/PRO)",
+			"description": "",
+			"environment": {},
+			"environmentPropertyOrder": null,
+			"metaSortKey": 0,
+			"_type": "request_group"
+		},
+		{
+			"_id": "req_report_current_month",
+			"parentId": "fld_reports",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Relatorio Mes Atual",
+			"description": "",
+			"url": "{{ _.base_url }}/api/reports/current-month",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": 0,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_report_period",
+			"parentId": "fld_reports",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Relatorio por Periodo",
+			"description": "",
+			"url": "{{ _.base_url }}/api/reports/period",
+			"method": "GET",
+			"body": {},
+			"parameters": [
+				{
+					"name": "start_date",
+					"value": "2025-01-01",
+					"disabled": false
+				},
+				{
+					"name": "end_date",
+					"value": "2025-12-31",
+					"disabled": false
+				}
+			],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": 1000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_report_yearly",
+			"parentId": "fld_reports",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Relatorio Anual",
+			"description": "",
+			"url": "{{ _.base_url }}/api/reports/yearly",
+			"method": "GET",
+			"body": {},
+			"parameters": [
+				{
+					"name": "year",
+					"value": "2025",
+					"disabled": false
+				}
+			],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": 2000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_report_category",
+			"parentId": "fld_reports",
+			"modified": 1735257600000,
+			"created": 1735257600000,
+			"name": "Relatorio por Categoria",
+			"description": "",
+			"url": "{{ _.base_url }}/api/reports/category/{{ _.category_id }}",
+			"method": "GET",
+			"body": {},
+			"parameters": [
+				{
+					"name": "start_date",
+					"value": "2025-01-01",
+					"disabled": false
+				},
+				{
+					"name": "end_date",
+					"value": "2025-12-31",
+					"disabled": false
+				}
+			],
+			"headers": [
+				{
+					"name": "Authorization",
+					"value": "Bearer {{ _.token }}"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": 3000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		}
+	]
+}
