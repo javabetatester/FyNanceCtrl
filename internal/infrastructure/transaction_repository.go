@@ -124,39 +124,11 @@ func (r *TransactionRepository) GetByIDAndUser(ctx context.Context, transactionI
 }
 
 func (r *TransactionRepository) GetAll(ctx context.Context, userID ulid.ULID, accountID *ulid.ULID, pagination *pkg.PaginationParams) ([]*transaction.Transaction, int64, error) {
-	if pagination == nil {
-		pagination = &pkg.PaginationParams{Page: 1, Limit: 10}
-	}
-	pagination.Normalize()
-
 	baseQuery := r.DB.WithContext(ctx).Table("transactions").Where("user_id = ?", userID.String())
 	if accountID != nil {
 		baseQuery = baseQuery.Where("account_id = ?", accountID.String())
 	}
-
-	var total int64
-	if err := baseQuery.Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-
-	var rows []transactionDB
-	query := baseQuery.Order("date DESC, created_at DESC").
-		Offset(pagination.Offset()).
-		Limit(pagination.Limit)
-	
-	err := query.Find(&rows).Error
-	if err != nil {
-		return nil, 0, err
-	}
-	out := make([]*transaction.Transaction, 0, len(rows))
-	for i := range rows {
-		t, err := toDomainTransaction(&rows[i])
-		if err != nil {
-			return nil, 0, err
-		}
-		out = append(out, t)
-	}
-	return out, total, nil
+	return pkg.Paginate(baseQuery, pagination, "date DESC, created_at DESC", toDomainTransaction)
 }
 
 func (r *TransactionRepository) GetByAmount(ctx context.Context, amount float64, pagination *pkg.PaginationParams) ([]*transaction.Transaction, int64, error) {

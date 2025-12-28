@@ -67,10 +67,10 @@ func (h *Handler) parsePagination(c *gin.Context) *pkg.PaginationParams {
 		limitNum = 10
 	}
 
-	return &pkg.PaginationParams{
+	return pkg.NormalizePagination(&pkg.PaginationParams{
 		Page:  pageNum,
 		Limit: limitNum,
-	}
+	})
 }
 
 func (h *Handler) respondError(c *gin.Context, err error) {

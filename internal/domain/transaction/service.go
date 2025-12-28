@@ -158,11 +158,7 @@ func (s *Service) GetTransactionByID(ctx context.Context, transactionID ulid.ULI
 }
 
 func (s *Service) GetAllTransactions(ctx context.Context, userID ulid.ULID, accountID *ulid.ULID, pagination *pkg.PaginationParams) ([]*Transaction, int64, error) {
-	transactions, total, err := s.Repository.GetAll(ctx, userID, accountID, pagination)
-	if err != nil {
-		return nil, 0, appErrors.NewDatabaseError(err)
-	}
-	return transactions, total, nil
+	return s.Repository.GetAll(ctx, userID, accountID, pagination)
 }
 
 func (s *Service) GetTransactionsByAmount(ctx context.Context, amount float64, pagination *pkg.PaginationParams) ([]*Transaction, int64, error) {
