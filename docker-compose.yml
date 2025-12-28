@@ -1,0 +1,69 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: fynance-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-fynance}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-fynance123}
+      POSTGRES_DB: ${DB_NAME:-fynance}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - fynance-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-fynance}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fynance-api
+    restart: unless-stopped
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    environment:
+      # Database
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-fynance}
+      DB_PASSWORD: ${DB_PASSWORD:-fynance123}
+      DB_NAME: ${DB_NAME:-fynance}
+      DB_SSL_MODE: ${DB_SSL_MODE:-disable}
+      DB_TIMEZONE: ${DB_TIMEZONE:-UTC}
+      DB_MAX_OPEN_CONNS: ${DB_MAX_OPEN_CONNS:-25}
+      DB_MAX_IDLE_CONNS: ${DB_MAX_IDLE_CONNS:-5}
+      DB_CONN_MAX_LIFETIME: ${DB_CONN_MAX_LIFETIME:-5m}
+      
+      # JWT
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-super-secret-key-change-in-production-min-32-chars}
+      JWT_ISSUER: ${JWT_ISSUER:-fynance_api}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
+      
+      # Application
+      APP_ENV: ${APP_ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      
+      # Server
+      SERVER_PORT: 8080
+      SERVER_READ_TIMEOUT: ${SERVER_READ_TIMEOUT:-15s}
+      SERVER_WRITE_TIMEOUT: ${SERVER_WRITE_TIMEOUT:-15s}
+      SERVER_IDLE_TIMEOUT: ${SERVER_IDLE_TIMEOUT:-60s}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - fynance-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  fynance-network:
+    driver: bridge

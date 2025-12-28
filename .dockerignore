@@ -1,0 +1,11 @@
+# Arquivos Git
+.git/
+.gitignore
+
+# Variáveis de ambiente
+.env
+
+# README e documentação (não necessários na imagem)
+README.md
+LICENSE
+*.md

@@ -9,6 +9,8 @@ API RESTful para gestão financeira pessoal desenvolvida em Go com foco em segur
 - [Arquitetura](#arquitetura)
 - [Requisitos](#requisitos)
 - [Instalação](#instalação)
+  - [Opção 1: Execução com Docker (Recomendado)](#opção-1-execução-com-docker-recomendado)
+  - [Opção 2: Instalação Manual](#opção-2-instalação-manual)
 - [Configuração](#configuração)
 - [Execução](#execução)
 - [Documentação da API](#documentação-da-api)
@@ -119,7 +121,14 @@ O projeto segue os princípios de **Clean Architecture** e **SOLID**, com separa
 
 ## Requisitos
 
-### Software
+### Para Execução com Docker (Recomendado)
+- **Docker**: [Download e instalação](https://docs.docker.com/get-docker/)
+- **Docker Compose**: [Download e instalação](https://docs.docker.com/compose/install/)
+- **Git**: Para clonar o repositório
+
+### Para Execução Manual
+
+#### Software
 - **Go 1.25+**: [Download e instalação](https://go.dev/dl/)
 - **PostgreSQL 12+**: [Download e instalação](https://www.postgresql.org/download/)
 - **Git**: Para clonar o repositório
@@ -153,27 +162,107 @@ Sugestão: crie um arquivo `.env` (não comite) e carregue com ferramentas como 
 
 ## Instalação
 
-### 1. Clonar o Repositório
+### Opção 1: Execução com Docker (Recomendado)
+
+A forma mais rápida de executar o projeto é usando Docker e Docker Compose. Esta abordagem não requer instalação manual do Go ou PostgreSQL.
+
+#### Pré-requisitos
+- [Docker](https://docs.docker.com/get-docker/)
+- [Docker Compose](https://docs.docker.com/compose/install/)
+
+#### Passos
+
+**Setup Manual**
+
+1. **Clonar o Repositório**
 
 ```bash
 git clone https://github.com/seu-usuario/fynance.git
 cd fynance
 ```
 
-### 2. Instalar Dependências
+2. **Configurar Variáveis de Ambiente**
+
+Copie o arquivo de exemplo e ajuste as variáveis conforme necessário:
+
+```bash
+cp .env.example .env
+```
+
+**IMPORTANTE**: Edite o arquivo `.env` e altere pelo menos:
+- `JWT_SECRET_KEY`: Use uma chave forte com mínimo 32 caracteres (gere com `openssl rand -base64 32`)
+- `DB_PASSWORD`: Defina uma senha segura para o banco de dados
+
+3. **Iniciar os Serviços**
+
+```bash
+docker-compose up -d
+```
+
+Este comando irá:
+- Criar e iniciar o container do PostgreSQL
+- Criar e iniciar o container da API
+- Executar as migrações automaticamente
+- Expor a API na porta 8080
+
+4. **Verificar Status dos Containers**
+
+```bash
+docker-compose ps
+```
+
+5. **Acessar a Aplicação**
+
+- API: http://localhost:8080/api
+- Swagger UI: http://localhost:8080/swagger/index.html
+
+#### Comandos Úteis Docker
+
+```bash
+# Ver logs da API
+docker-compose logs -f api
+
+# Ver logs do banco de dados
+docker-compose logs -f db
+
+# Parar os serviços
+docker-compose down
+
+# Parar e remover volumes (dados do banco)
+docker-compose down -v
+
+# Rebuild da API após mudanças no código
+docker-compose up -d --build api
+
+# Executar comandos dentro do container da API
+docker-compose exec api sh
+```
+
+### Opção 2: Instalação Manual
+
+Se preferir executar localmente sem Docker:
+
+#### 1. Clonar o Repositório
+
+```bash
+git clone https://github.com/seu-usuario/fynance.git
+cd fynance
+```
+
+#### 2. Instalar Dependências
 
 ```bash
 go mod download
 ```
 
-### 3. Configurar Banco de Dados PostgreSQL
+#### 3. Configurar Banco de Dados PostgreSQL
 
 Certifique-se de que o PostgreSQL está instalado e rodando e que as variáveis `DB_*` apontam para o servidor correto. Não é necessário alterar código; toda a configuração passa por variáveis de ambiente.
 
-### 4. Criar Banco de Dados (se necessário)
+#### 4. Criar Banco de Dados (se necessário)
 
 ```sql
-CREATE DATABASE postgres;
+CREATE DATABASE fynance;
 ```
 
 As migrações são executadas automaticamente na inicialização da aplicação.
