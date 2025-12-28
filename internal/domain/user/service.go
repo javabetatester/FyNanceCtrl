@@ -1,6 +1,7 @@
 package user
 
 import (
+	appErrors "Fynance/internal/errors"
 	"Fynance/internal/pkg"
 	"context"
 
@@ -13,13 +14,13 @@ type Service struct {
 }
 
 func (s *Service) Create(ctx context.Context, user *User) error {
-	user.Id = pkg.GenerateULID()
+	user.Id = pkg.GenerateULIDObject()
 
 	now := pkg.SetTimestamps()
 	user.CreatedAt = now
 	user.UpdatedAt = now
 
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), 12)
 	if err != nil {
 		return err
 	}
@@ -32,11 +33,11 @@ func (s *Service) Update(ctx context.Context, user *User) error {
 	return s.Repository.Update(ctx, user)
 }
 
-func (s *Service) Delete(ctx context.Context, id string) error {
+func (s *Service) Delete(ctx context.Context, id ulid.ULID) error {
 	return s.Repository.Delete(ctx, id)
 }
 
-func (s *Service) GetByID(ctx context.Context, id string) (*User, error) {
+func (s *Service) GetByID(ctx context.Context, id ulid.ULID) (*User, error) {
 	user, err := s.Repository.GetById(ctx, id)
 	if err != nil {
 		return nil, err
@@ -54,4 +55,25 @@ func (s *Service) GetPlan(ctx context.Context, id ulid.ULID) (Plan, error) {
 		return "", err
 	}
 	return plan, nil
+}
+
+func (s *Service) UpdatePlan(ctx context.Context, userID ulid.ULID, newPlan Plan) error {
+	if !newPlan.IsValid() {
+		return appErrors.NewValidationError("plan", "plano invalido")
+	}
+
+	user, err := s.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	if user.Plan == newPlan {
+		return nil
+	}
+
+	user.Plan = newPlan
+	user.PlanSince = pkg.SetTimestamps()
+	user.UpdatedAt = pkg.SetTimestamps()
+
+	return s.Repository.Update(ctx, user)
 }

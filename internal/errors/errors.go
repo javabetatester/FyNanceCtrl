@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+
+	"github.com/go-playground/validator/v10"
 )
 
 var (
@@ -155,5 +157,66 @@ func NewConflictError(resource string) *AppError {
 		Details: map[string]interface{}{
 			"resource": resource,
 		},
+	}
+}
+
+func ParseValidationErrors(err error) *AppError {
+	var validationErrors validator.ValidationErrors
+	if !errors.As(err, &validationErrors) {
+		return ErrBadRequest.WithError(err)
+	}
+
+	fieldErrors := make([]map[string]string, 0, len(validationErrors))
+	for _, fieldErr := range validationErrors {
+		fieldErrors = append(fieldErrors, map[string]string{
+			"field":   fieldErr.Field(),
+			"message": translateValidationError(fieldErr),
+		})
+	}
+
+	return &AppError{
+		Code:       "VALIDATION_ERROR",
+		Message:    "Erro de validação nos campos",
+		StatusCode: http.StatusBadRequest,
+		Details: map[string]interface{}{
+			"fields": fieldErrors,
+		},
+	}
+}
+
+func translateValidationError(fe validator.FieldError) string {
+	switch fe.Tag() {
+	case "required":
+		return "Campo obrigatório"
+	case "email":
+		return "Email inválido"
+	case "min":
+		return fmt.Sprintf("Deve ter no mínimo %s caracteres", fe.Param())
+	case "max":
+		return fmt.Sprintf("Deve ter no máximo %s caracteres", fe.Param())
+	case "gte":
+		return fmt.Sprintf("Deve ser maior ou igual a %s", fe.Param())
+	case "lte":
+		return fmt.Sprintf("Deve ser menor ou igual a %s", fe.Param())
+	case "gt":
+		return fmt.Sprintf("Deve ser maior que %s", fe.Param())
+	case "lt":
+		return fmt.Sprintf("Deve ser menor que %s", fe.Param())
+	case "len":
+		return fmt.Sprintf("Deve ter exatamente %s caracteres", fe.Param())
+	case "oneof":
+		return fmt.Sprintf("Deve ser um dos valores: %s", fe.Param())
+	case "uuid":
+		return "UUID inválido"
+	case "url":
+		return "URL inválida"
+	case "datetime":
+		return "Data/hora inválida"
+	case "numeric":
+		return "Deve ser um valor numérico"
+	case "alphanum":
+		return "Deve conter apenas letras e números"
+	default:
+		return fmt.Sprintf("Validação '%s' falhou", fe.Tag())
 	}
 }
