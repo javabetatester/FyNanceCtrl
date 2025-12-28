@@ -10,19 +10,25 @@ import (
 	"Fynance/internal/domain/goal"
 	"Fynance/internal/domain/user"
 	appErrors "Fynance/internal/errors"
+	"Fynance/internal/pkg"
 
 	"github.com/oklog/ulid/v2"
 )
 
 type fakeGoalRepository struct {
-	createFn                 func(ctx context.Context, goal *goal.Goal) error
-	updateFn                 func(ctx context.Context, goal *goal.Goal) error
-	deleteFn                 func(ctx context.Context, id ulid.ULID) error
-	getByIDFn                func(ctx context.Context, id ulid.ULID) (*goal.Goal, error)
-	getByUserFn              func(ctx context.Context, userId ulid.ULID) ([]*goal.Goal, error)
-	listFn                   func(ctx context.Context) ([]*goal.Goal, error)
-	checkGoalBelongsToUserFn func(ctx context.Context, goalID ulid.ULID, userID ulid.ULID) (bool, error)
-	updateFieldsFn           func(ctx context.Context, id ulid.ULID, fields map[string]interface{}) error
+	createFn                    func(ctx context.Context, goal *goal.Goal) error
+	updateFn                    func(ctx context.Context, goal *goal.Goal) error
+	deleteFn                    func(ctx context.Context, id ulid.ULID) error
+	getByIDFn                   func(ctx context.Context, id ulid.ULID) (*goal.Goal, error)
+	getByIdAndUserFn            func(ctx context.Context, id, userID ulid.ULID) (*goal.Goal, error)
+	getByUserFn                 func(ctx context.Context, userId ulid.ULID, pagination *pkg.PaginationParams) ([]*goal.Goal, int64, error)
+	listFn                      func(ctx context.Context, pagination *pkg.PaginationParams) ([]*goal.Goal, int64, error)
+	checkGoalBelongsToUserFn    func(ctx context.Context, goalID ulid.ULID, userID ulid.ULID) (bool, error)
+	updateFieldsFn              func(ctx context.Context, id ulid.ULID, fields map[string]interface{}) error
+	createContributionFn        func(ctx context.Context, contribution *goal.Contribution) error
+	getContributionsFn          func(ctx context.Context, goalId ulid.ULID, userId ulid.ULID) ([]*goal.Contribution, error)
+	updateCurrentAmountFn       func(ctx context.Context, goalId ulid.ULID, amount float64) error
+	updateCurrentAmountAtomicFn func(ctx context.Context, goalId ulid.ULID, delta float64) error
 }
 
 func (f *fakeGoalRepository) Create(ctx context.Context, g *goal.Goal) error {
@@ -32,11 +38,11 @@ func (f *fakeGoalRepository) Create(ctx context.Context, g *goal.Goal) error {
 	return nil
 }
 
-func (f *fakeGoalRepository) List(ctx context.Context) ([]*goal.Goal, error) {
+func (f *fakeGoalRepository) List(ctx context.Context, pagination *pkg.PaginationParams) ([]*goal.Goal, int64, error) {
 	if f.listFn != nil {
-		return f.listFn(ctx)
+		return f.listFn(ctx, pagination)
 	}
-	return nil, nil
+	return nil, 0, nil
 }
 
 func (f *fakeGoalRepository) Update(ctx context.Context, g *goal.Goal) error {
@@ -67,11 +73,11 @@ func (f *fakeGoalRepository) GetById(ctx context.Context, id ulid.ULID) (*goal.G
 	return nil, nil
 }
 
-func (f *fakeGoalRepository) GetByUserId(ctx context.Context, userId ulid.ULID) ([]*goal.Goal, error) {
+func (f *fakeGoalRepository) GetByUserId(ctx context.Context, userId ulid.ULID, pagination *pkg.PaginationParams) ([]*goal.Goal, int64, error) {
 	if f.getByUserFn != nil {
-		return f.getByUserFn(ctx, userId)
+		return f.getByUserFn(ctx, userId, pagination)
 	}
-	return nil, nil
+	return nil, 0, nil
 }
 
 func (f *fakeGoalRepository) CheckGoalBelongsToUser(ctx context.Context, goalID ulid.ULID, userID ulid.ULID) (bool, error) {
@@ -81,20 +87,68 @@ func (f *fakeGoalRepository) CheckGoalBelongsToUser(ctx context.Context, goalID 
 	return true, nil
 }
 
+func (f *fakeGoalRepository) CreateContribution(ctx context.Context, contribution *goal.Contribution) error {
+	if f.createContributionFn != nil {
+		return f.createContributionFn(ctx, contribution)
+	}
+	return nil
+}
+
+func (f *fakeGoalRepository) GetContributionsByGoalId(ctx context.Context, goalId ulid.ULID, userId ulid.ULID) ([]*goal.Contribution, error) {
+	if f.getContributionsFn != nil {
+		return f.getContributionsFn(ctx, goalId, userId)
+	}
+	return nil, nil
+}
+
+func (f *fakeGoalRepository) UpdateCurrentAmount(ctx context.Context, goalId ulid.ULID, amount float64) error {
+	if f.updateCurrentAmountFn != nil {
+		return f.updateCurrentAmountFn(ctx, goalId, amount)
+	}
+	return nil
+}
+
+func (f *fakeGoalRepository) GetByIdAndUser(ctx context.Context, id, userID ulid.ULID) (*goal.Goal, error) {
+	if f.getByIdAndUserFn != nil {
+		return f.getByIdAndUserFn(ctx, id, userID)
+	}
+	if f.getByIDFn != nil {
+		return f.getByIDFn(ctx, id)
+	}
+	return nil, nil
+}
+
+func (f *fakeGoalRepository) UpdateCurrentAmountAtomic(ctx context.Context, goalId ulid.ULID, delta float64) error {
+	if f.updateCurrentAmountAtomicFn != nil {
+		return f.updateCurrentAmountAtomicFn(ctx, goalId, delta)
+	}
+	if f.updateCurrentAmountFn != nil {
+		g, err := f.GetById(ctx, goalId)
+		if err != nil {
+			return err
+		}
+		if g == nil {
+			return nil
+		}
+		return f.updateCurrentAmountFn(ctx, goalId, g.CurrentAmount+delta)
+	}
+	return nil
+}
+
 type fakeUserRepository struct {
-	getByIDFn func(ctx context.Context, id string) (*user.User, error)
+	getByIDFn func(ctx context.Context, id ulid.ULID) (*user.User, error)
 }
 
 func (f *fakeUserRepository) Create(ctx context.Context, _ *user.User) error { return nil }
 func (f *fakeUserRepository) Update(ctx context.Context, _ *user.User) error { return nil }
-func (f *fakeUserRepository) Delete(ctx context.Context, _ string) error     { return nil }
+func (f *fakeUserRepository) Delete(ctx context.Context, _ ulid.ULID) error { return nil }
 func (f *fakeUserRepository) GetByEmail(ctx context.Context, _ string) (*user.User, error) {
 	return nil, nil
 }
 func (f *fakeUserRepository) GetPlan(ctx context.Context, _ ulid.ULID) (user.Plan, error) {
 	return "", nil
 }
-func (f *fakeUserRepository) GetById(ctx context.Context, id string) (*user.User, error) {
+func (f *fakeUserRepository) GetById(ctx context.Context, id ulid.ULID) (*user.User, error) {
 	if f.getByIDFn != nil {
 		return f.getByIDFn(ctx, id)
 	}
@@ -177,7 +231,7 @@ func TestServiceCreateGoal(t *testing.T) {
 	}
 
 	successUserRepo := &fakeUserRepository{
-		getByIDFn: func(ctx context.Context, id string) (*user.User, error) {
+		getByIDFn: func(ctx context.Context, id ulid.ULID) (*user.User, error) {
 			return &user.User{Id: id}, nil
 		},
 	}
@@ -197,7 +251,7 @@ func TestServiceCreateGoal(t *testing.T) {
 	t.Run("fails when user not found", func(t *testing.T) {
 		svc := makeService(fields{
 			userRepo: &fakeUserRepository{
-				getByIDFn: func(ctx context.Context, id string) (*user.User, error) {
+				getByIDFn: func(ctx context.Context, id ulid.ULID) (*user.User, error) {
 					return nil, errors.New("not found")
 				},
 			},
