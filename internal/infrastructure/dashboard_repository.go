@@ -2,9 +2,11 @@ package infrastructure
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"Fynance/internal/domain/dashboard"
+	"Fynance/internal/domain/transaction"
 	appErrors "Fynance/internal/errors"
 	"Fynance/internal/pkg"
 
@@ -126,13 +128,13 @@ func (r *DashboardRepository) GetExpensesByCategory(ctx context.Context, userID 
 	endDate := startDate.AddDate(0, 1, 0)
 
 	type categoryResult struct {
-		CategoryId string  `gorm:"column:category_id"`
-		Name       string  `gorm:"column:name"`
+		CategoryId *string `gorm:"column:category_id"`
+		Name       *string `gorm:"column:name"`
 		Amount     float64 `gorm:"column:amount"`
 	}
 
 	query := r.DB.WithContext(ctx).Table("transactions t").
-		Select("t.category_id, c.name, SUM(t.amount) as amount").
+		Select("t.category_id, c.name, SUM(ABS(t.amount)) as amount").
 		Joins("LEFT JOIN categories c ON t.category_id = c.id").
 		Where("t.user_id = ? AND t.type = ? AND t.date >= ? AND t.date < ?", userID.String(), "EXPENSE", startDate, endDate)
 	if accountID != nil {
@@ -141,9 +143,14 @@ func (r *DashboardRepository) GetExpensesByCategory(ctx context.Context, userID 
 
 	var results []categoryResult
 	if err := query.Group("t.category_id, c.name").
+		Having("SUM(ABS(t.amount)) > 0").
 		Order("amount DESC").
 		Scan(&results).Error; err != nil {
 		return nil, appErrors.NewDatabaseError(err)
+	}
+
+	if len(results) == 0 {
+		return []*dashboard.CategoryExpense{}, nil
 	}
 
 	var total float64
@@ -153,9 +160,25 @@ func (r *DashboardRepository) GetExpensesByCategory(ctx context.Context, userID 
 
 	items := make([]*dashboard.CategoryExpense, 0, len(results))
 	for _, r := range results {
-		categoryID, err := pkg.ParseULID(r.CategoryId)
-		if err != nil {
+		if r.Amount <= 0 {
 			continue
+		}
+		var categoryID ulid.ULID
+		if r.CategoryId != nil && *r.CategoryId != "" {
+			categoryIdStr := strings.TrimSpace(*r.CategoryId)
+			if categoryIdStr != "" && categoryIdStr != "NULL" {
+				parsed, err := pkg.ParseULID(categoryIdStr)
+				if err == nil {
+					categoryID = parsed
+				}
+			}
+		}
+		categoryName := "Sem categoria"
+		if r.Name != nil && *r.Name != "" {
+			nameStr := strings.TrimSpace(*r.Name)
+			if nameStr != "" && nameStr != "NULL" {
+				categoryName = nameStr
+			}
 		}
 		percentage := 0.0
 		if total > 0 {
@@ -163,7 +186,7 @@ func (r *DashboardRepository) GetExpensesByCategory(ctx context.Context, userID 
 		}
 		items = append(items, &dashboard.CategoryExpense{
 			CategoryId:   categoryID,
-			CategoryName: r.Name,
+			CategoryName: categoryName,
 			Amount:       r.Amount,
 			Percentage:   percentage,
 		})
@@ -174,23 +197,26 @@ func (r *DashboardRepository) GetExpensesByCategory(ctx context.Context, userID 
 
 func (r *DashboardRepository) GetRecentTransactions(ctx context.Context, userID ulid.ULID, accountID *ulid.ULID, limit int) ([]*dashboard.TransactionSummary, error) {
 	type transactionResult struct {
-		Id          string    `gorm:"column:id"`
-		Type        string    `gorm:"column:type"`
-		Amount      float64   `gorm:"column:amount"`
-		Description string    `gorm:"column:description"`
-		CategoryId  string    `gorm:"column:category_id"`
-		Date        time.Time `gorm:"column:date"`
+		Id           string    `gorm:"column:id"`
+		Type         string    `gorm:"column:type"`
+		Amount       float64   `gorm:"column:amount"`
+		Description  string    `gorm:"column:description"`
+		CategoryId   string    `gorm:"column:category_id"`
+		CategoryName string    `gorm:"column:category_name"`
+		Date         time.Time `gorm:"column:date"`
+		AccountId    string    `gorm:"column:account_id"`
 	}
 
-	query := r.DB.WithContext(ctx).Table("transactions").
-		Select("id, type, amount, description, category_id, date").
-		Where("user_id = ?", userID.String())
+	query := r.DB.WithContext(ctx).Table("transactions t").
+		Select("t.id, t.type, t.amount, t.description, t.category_id, c.name as category_name, t.date, t.account_id").
+		Joins("LEFT JOIN categories c ON t.category_id = c.id").
+		Where("t.user_id = ?", userID.String())
 	if accountID != nil {
-		query = query.Where("account_id = ?", accountID.String())
+		query = query.Where("t.account_id = ?", accountID.String())
 	}
 
 	var results []transactionResult
-	if err := query.Order("date DESC, created_at DESC").
+	if err := query.Order("t.date DESC, t.created_at DESC").
 		Limit(limit).
 		Scan(&results).Error; err != nil {
 		return nil, appErrors.NewDatabaseError(err)
@@ -204,15 +230,21 @@ func (r *DashboardRepository) GetRecentTransactions(ctx context.Context, userID 
 		}
 		categoryID, err := pkg.ParseULID(r.CategoryId)
 		if err != nil {
+			categoryID = ulid.ULID{}
+		}
+		accountID, err := pkg.ParseULID(r.AccountId)
+		if err != nil {
 			continue
 		}
 		items = append(items, &dashboard.TransactionSummary{
-			Id:          id,
-			Type:        r.Type,
-			Amount:      r.Amount,
-			Description: r.Description,
-			CategoryId:  categoryID,
-			Date:        r.Date,
+			Id:           id,
+			Type:         r.Type,
+			Amount:       r.Amount,
+			Description:  r.Description,
+			CategoryId:   categoryID,
+			CategoryName: r.CategoryName,
+			Date:         r.Date,
+			AccountId:    accountID,
 		})
 	}
 
@@ -334,7 +366,7 @@ func (r *DashboardRepository) GetAccountsSummary(ctx context.Context, userID uli
 	var results []accountResult
 	if err := r.DB.WithContext(ctx).Table("accounts").
 		Select("id, name, type, balance, color").
-		Where("user_id = ? AND is_active = ?", userID.String(), true).
+		Where("user_id = ? AND is_active = ? AND type != ?", userID.String(), true, "CREDIT_CARD").
 		Order("name ASC").
 		Scan(&results).Error; err != nil {
 		return nil, appErrors.NewDatabaseError(err)
@@ -352,6 +384,101 @@ func (r *DashboardRepository) GetAccountsSummary(ctx context.Context, userID uli
 			Type:    r.Type,
 			Balance: r.Balance,
 			Color:   r.Color,
+		})
+	}
+
+	return items, nil
+}
+
+func (r *DashboardRepository) GetUserCategories(ctx context.Context, userID ulid.ULID) ([]*transaction.Category, error) {
+	type categoryResult struct {
+		Id        string    `gorm:"column:id"`
+		UserId    string    `gorm:"column:user_id"`
+		Name      string    `gorm:"column:name"`
+		Icon      string    `gorm:"column:icon"`
+		CreatedAt time.Time `gorm:"column:created_at"`
+		UpdatedAt time.Time `gorm:"column:updated_at"`
+	}
+
+	var results []categoryResult
+	if err := r.DB.WithContext(ctx).Table("categories").
+		Where("user_id = ?", userID.String()).
+		Order("name ASC").
+		Scan(&results).Error; err != nil {
+		return nil, appErrors.NewDatabaseError(err)
+	}
+
+	items := make([]*transaction.Category, 0, len(results))
+	for _, r := range results {
+		id, err := pkg.ParseULID(r.Id)
+		if err != nil {
+			continue
+		}
+		uid, err := pkg.ParseULID(r.UserId)
+		if err != nil {
+			continue
+		}
+		items = append(items, &transaction.Category{
+			Id:        id,
+			UserId:    uid,
+			Name:      r.Name,
+			Icon:      r.Icon,
+			CreatedAt: r.CreatedAt,
+			UpdatedAt: r.UpdatedAt,
+		})
+	}
+
+	return items, nil
+}
+
+func (r *DashboardRepository) GetMonthExpenses(ctx context.Context, userID ulid.ULID, accountID *ulid.ULID, month, year int) ([]*dashboard.TransactionSummary, error) {
+	startDate := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
+	endDate := startDate.AddDate(0, 1, 0)
+
+	type transactionResult struct {
+		Id           string    `gorm:"column:id"`
+		Type         string    `gorm:"column:type"`
+		Amount       float64   `gorm:"column:amount"`
+		Description  string    `gorm:"column:description"`
+		CategoryId   *string   `gorm:"column:category_id"`
+		CategoryName string    `gorm:"column:category_name"`
+		Date         time.Time `gorm:"column:date"`
+	}
+
+	query := r.DB.WithContext(ctx).Table("transactions t").
+		Select("t.id, t.type, t.amount, t.description, t.category_id, c.name as category_name, t.date").
+		Joins("LEFT JOIN categories c ON t.category_id = c.id").
+		Where("t.user_id = ? AND t.type = ? AND t.date >= ? AND t.date < ?", userID.String(), "EXPENSE", startDate, endDate)
+	if accountID != nil {
+		query = query.Where("t.account_id = ?", accountID.String())
+	}
+
+	var results []transactionResult
+	if err := query.Order("t.date DESC, t.created_at DESC").Scan(&results).Error; err != nil {
+		return nil, appErrors.NewDatabaseError(err)
+	}
+
+	items := make([]*dashboard.TransactionSummary, 0, len(results))
+	for _, r := range results {
+		id, err := pkg.ParseULID(r.Id)
+		if err != nil {
+			continue
+		}
+		var categoryID ulid.ULID
+		if r.CategoryId != nil && *r.CategoryId != "" {
+			parsed, err := pkg.ParseULID(*r.CategoryId)
+			if err == nil {
+				categoryID = parsed
+			}
+		}
+		items = append(items, &dashboard.TransactionSummary{
+			Id:           id,
+			Type:         r.Type,
+			Amount:       r.Amount,
+			Description:  r.Description,
+			CategoryId:   categoryID,
+			CategoryName: r.CategoryName,
+			Date:         r.Date,
 		})
 	}
 

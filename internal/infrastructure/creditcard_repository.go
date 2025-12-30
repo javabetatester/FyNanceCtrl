@@ -59,19 +59,20 @@ func (invoiceDB) TableName() string {
 }
 
 type creditCardTransactionDB struct {
-	Id                string    `gorm:"type:varchar(26);primaryKey"`
-	CreditCardId      string    `gorm:"type:varchar(26);index;not null"`
-	InvoiceId         string    `gorm:"type:varchar(26);index;not null"`
-	UserId            string    `gorm:"type:varchar(26);index;not null"`
-	CategoryId        string    `gorm:"type:varchar(26);index;not null"`
-	Amount            float64   `gorm:"type:decimal(15,2);not null"`
-	Description       string    `gorm:"type:varchar(255)"`
-	Date              time.Time `gorm:"type:date;not null"`
-	Installments      int       `gorm:"not null;default:1"`
-	CurrentInstallment int      `gorm:"not null;default:1"`
-	IsRecurring       bool      `gorm:"not null;default:false"`
-	CreatedAt         time.Time `gorm:"not null"`
-	UpdatedAt         time.Time `gorm:"not null"`
+	Id                 string    `gorm:"type:varchar(26);primaryKey;column:id"`
+	CreditCardId       string    `gorm:"type:varchar(26);index;not null;column:credit_card_id"`
+	InvoiceId          string    `gorm:"type:varchar(26);index;not null;column:invoice_id"`
+	UserId             string    `gorm:"type:varchar(26);index;not null;column:user_id"`
+	CategoryId         string    `gorm:"type:varchar(26);index;not null;column:category_id"`
+	CategoryName       string    `gorm:"->;column:category_name"`
+	Amount             float64   `gorm:"type:decimal(15,2);not null;column:amount"`
+	Description        string    `gorm:"type:varchar(255);column:description"`
+	Date               time.Time `gorm:"type:date;not null;column:date"`
+	Installments       int       `gorm:"not null;default:1;column:installments"`
+	CurrentInstallment int       `gorm:"not null;default:1;column:current_installment"`
+	IsRecurring        bool      `gorm:"not null;default:false;column:is_recurring"`
+	CreatedAt          time.Time `gorm:"not null;column:created_at"`
+	UpdatedAt          time.Time `gorm:"not null;column:updated_at"`
 }
 
 func (creditCardTransactionDB) TableName() string {
@@ -200,38 +201,42 @@ func toDomainCreditCardTransaction(tdb *creditCardTransactionDB) (*creditcard.Cr
 		return nil, err
 	}
 
-	return &creditcard.CreditCardTransaction{
-		Id:                id,
-		CreditCardId:      ccid,
-		InvoiceId:         invid,
-		UserId:            uid,
-		CategoryId:        cid,
-		Amount:            tdb.Amount,
-		Description:       tdb.Description,
-		Date:              tdb.Date,
-		Installments:      tdb.Installments,
+	tx := &creditcard.CreditCardTransaction{
+		Id:                 id,
+		CreditCardId:       ccid,
+		InvoiceId:          invid,
+		UserId:             uid,
+		CategoryId:         cid,
+		Amount:             tdb.Amount,
+		Description:        tdb.Description,
+		Date:               tdb.Date,
+		Installments:       tdb.Installments,
 		CurrentInstallment: tdb.CurrentInstallment,
-		IsRecurring:       tdb.IsRecurring,
-		CreatedAt:         tdb.CreatedAt,
-		UpdatedAt:         tdb.UpdatedAt,
-	}, nil
+		IsRecurring:        tdb.IsRecurring,
+		CreatedAt:          tdb.CreatedAt,
+		UpdatedAt:          tdb.UpdatedAt,
+	}
+	if tdb.CategoryName != "" {
+		tx.CategoryName = tdb.CategoryName
+	}
+	return tx, nil
 }
 
 func toDBCreditCardTransaction(t *creditcard.CreditCardTransaction) *creditCardTransactionDB {
 	return &creditCardTransactionDB{
-		Id:                t.Id.String(),
-		CreditCardId:      t.CreditCardId.String(),
-		InvoiceId:         t.InvoiceId.String(),
-		UserId:            t.UserId.String(),
-		CategoryId:        t.CategoryId.String(),
-		Amount:            t.Amount,
-		Description:       t.Description,
-		Date:              t.Date,
-		Installments:      t.Installments,
+		Id:                 t.Id.String(),
+		CreditCardId:       t.CreditCardId.String(),
+		InvoiceId:          t.InvoiceId.String(),
+		UserId:             t.UserId.String(),
+		CategoryId:         t.CategoryId.String(),
+		Amount:             t.Amount,
+		Description:        t.Description,
+		Date:               t.Date,
+		Installments:       t.Installments,
 		CurrentInstallment: t.CurrentInstallment,
-		IsRecurring:       t.IsRecurring,
-		CreatedAt:         t.CreatedAt,
-		UpdatedAt:         t.UpdatedAt,
+		IsRecurring:        t.IsRecurring,
+		CreatedAt:          t.CreatedAt,
+		UpdatedAt:          t.UpdatedAt,
 	}
 }
 
@@ -369,6 +374,9 @@ func (r *CreditCardRepository) GetCurrentInvoice(ctx context.Context, cardID, us
 			cardID.String(), userID.String(), currentMonth, currentYear, string(creditcard.InvoiceOpen)).
 		First(&idb).Error
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return toDomainInvoice(&idb)
@@ -400,15 +408,19 @@ func (r *CreditCardRepository) GetTransactionsByInvoice(ctx context.Context, inv
 	}
 	pagination.Normalize()
 
-	baseQuery := r.DB.WithContext(ctx).Table("credit_card_transactions").Where("invoice_id = ? AND user_id = ?", invoiceID.String(), userID.String())
+	countQuery := r.DB.WithContext(ctx).Table("credit_card_transactions t").Where("t.invoice_id = ? AND t.user_id = ?", invoiceID.String(), userID.String())
+	dataQuery := r.DB.WithContext(ctx).Table("credit_card_transactions t").
+		Select("t.*, c.name as category_name").
+		Joins("LEFT JOIN categories c ON t.category_id = c.id").
+		Where("t.invoice_id = ? AND t.user_id = ?", invoiceID.String(), userID.String())
 
 	var total int64
-	if err := baseQuery.Count(&total).Error; err != nil {
+	if err := countQuery.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
 	var rows []creditCardTransactionDB
-	err := baseQuery.Order("date DESC").
+	err := dataQuery.Order("t.date DESC").
 		Offset(pagination.Offset()).
 		Limit(pagination.Limit).
 		Find(&rows).Error
@@ -420,7 +432,7 @@ func (r *CreditCardRepository) GetTransactionsByInvoice(ctx context.Context, inv
 	for i := range rows {
 		transaction, err := toDomainCreditCardTransaction(&rows[i])
 		if err != nil {
-			return nil, 0, err
+			continue
 		}
 		transactions = append(transactions, transaction)
 	}
@@ -433,15 +445,19 @@ func (r *CreditCardRepository) GetTransactionsByCreditCard(ctx context.Context, 
 	}
 	pagination.Normalize()
 
-	baseQuery := r.DB.WithContext(ctx).Table("credit_card_transactions").Where("credit_card_id = ? AND user_id = ?", cardID.String(), userID.String())
+	countQuery := r.DB.WithContext(ctx).Table("credit_card_transactions t").Where("t.credit_card_id = ? AND t.user_id = ?", cardID.String(), userID.String())
+	dataQuery := r.DB.WithContext(ctx).Table("credit_card_transactions t").
+		Select("t.*, c.name as category_name").
+		Joins("LEFT JOIN categories c ON t.category_id = c.id").
+		Where("t.credit_card_id = ? AND t.user_id = ?", cardID.String(), userID.String())
 
 	var total int64
-	if err := baseQuery.Count(&total).Error; err != nil {
+	if err := countQuery.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
 	var rows []creditCardTransactionDB
-	err := baseQuery.Order("date DESC").
+	err := dataQuery.Order("t.date DESC").
 		Offset(pagination.Offset()).
 		Limit(pagination.Limit).
 		Find(&rows).Error
@@ -453,7 +469,7 @@ func (r *CreditCardRepository) GetTransactionsByCreditCard(ctx context.Context, 
 	for i := range rows {
 		transaction, err := toDomainCreditCardTransaction(&rows[i])
 		if err != nil {
-			return nil, 0, err
+			continue
 		}
 		transactions = append(transactions, transaction)
 	}

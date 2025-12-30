@@ -6,6 +6,7 @@ import (
 
 	"Fynance/internal/domain/account"
 	"Fynance/internal/pkg"
+	"Fynance/internal/pkg/query"
 
 	"github.com/oklog/ulid/v2"
 	"gorm.io/gorm"
@@ -25,6 +26,7 @@ type accountDB struct {
 	Icon           string    `gorm:"type:varchar(50)"`
 	IncludeInTotal bool      `gorm:"not null;default:true"`
 	IsActive       bool      `gorm:"not null;default:true"`
+	CreditCardId   *string   `gorm:"type:varchar(26);index"`
 	CreatedAt      time.Time `gorm:"not null"`
 	UpdatedAt      time.Time `gorm:"not null"`
 }
@@ -44,6 +46,14 @@ func toDomainAccount(adb *accountDB) (*account.Account, error) {
 		return nil, err
 	}
 
+	var creditCardID *ulid.ULID
+	if adb.CreditCardId != nil && *adb.CreditCardId != "" {
+		parsed, err := pkg.ParseULID(*adb.CreditCardId)
+		if err == nil {
+			creditCardID = &parsed
+		}
+	}
+
 	return &account.Account{
 		Id:             id,
 		UserId:         userID,
@@ -54,17 +64,25 @@ func toDomainAccount(adb *accountDB) (*account.Account, error) {
 		Icon:           adb.Icon,
 		IncludeInTotal: adb.IncludeInTotal,
 		IsActive:       adb.IsActive,
+		CreditCardId:   creditCardID,
 		CreatedAt:      adb.CreatedAt,
 		UpdatedAt:      adb.UpdatedAt,
 	}, nil
 }
 
 func toDBAccount(a *account.Account) *accountDB {
+	var creditCardID *string
+	if a.CreditCardId != nil {
+		s := a.CreditCardId.String()
+		creditCardID = &s
+	}
+
 	return &accountDB{
 		Id:             a.Id.String(),
 		UserId:         a.UserId.String(),
 		Name:           a.Name,
 		Type:           string(a.Type),
+		CreditCardId:   creditCardID,
 		Balance:        a.Balance,
 		Color:          a.Color,
 		Icon:           a.Icon,
@@ -98,70 +116,41 @@ func (r *AccountRepository) GetById(ctx context.Context, accountID, userID ulid.
 	return toDomainAccount(&adb)
 }
 
+func (r *AccountRepository) FindByUser(ctx context.Context, userID ulid.ULID) *query.Query[accountDB] {
+	return query.New[accountDB](r.DB, "accounts").
+		Context(ctx).
+		Where("user_id = ? AND type != ?", userID.String(), string(account.TypeCreditCard)).
+		Order("created_at DESC")
+}
+
+func (r *AccountRepository) FindActiveByUser(ctx context.Context, userID ulid.ULID) *query.Query[accountDB] {
+	return query.New[accountDB](r.DB, "accounts").
+		Context(ctx).
+		Where("user_id = ? AND is_active = ? AND type != ?", userID.String(), true, string(account.TypeCreditCard)).
+		Order("created_at DESC")
+}
+
+func (r *AccountRepository) Converter() func(*accountDB) (*account.Account, error) {
+	return toDomainAccount
+}
+
 func (r *AccountRepository) GetByUserId(ctx context.Context, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*account.Account, int64, error) {
-	if pagination == nil {
-		pagination = &pkg.PaginationParams{Page: 1, Limit: 10}
-	}
-	pagination.Normalize()
-
-	baseQuery := r.DB.WithContext(ctx).Table("accounts").Where("user_id = ?", userID.String())
-
-	var total int64
-	if err := baseQuery.Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-
-	var rows []accountDB
-	err := baseQuery.Order("created_at DESC").
-		Offset(pagination.Offset()).
-		Limit(pagination.Limit).
-		Find(&rows).Error
-	if err != nil {
-		return nil, 0, err
-	}
-
-	accounts := make([]*account.Account, 0, len(rows))
-	for i := range rows {
-		a, err := toDomainAccount(&rows[i])
-		if err != nil {
-			return nil, 0, err
-		}
-		accounts = append(accounts, a)
-	}
-	return accounts, total, nil
+	baseQuery := r.DB.WithContext(ctx).Table("accounts").Where("user_id = ? AND type != ?", userID.String(), string(account.TypeCreditCard))
+	return pkg.Paginate(baseQuery, pagination, "created_at DESC", toDomainAccount)
 }
 
 func (r *AccountRepository) GetActiveByUserId(ctx context.Context, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*account.Account, int64, error) {
-	if pagination == nil {
-		pagination = &pkg.PaginationParams{Page: 1, Limit: 10}
-	}
-	pagination.Normalize()
+	baseQuery := r.DB.WithContext(ctx).Table("accounts").Where("user_id = ? AND is_active = ? AND type != ?", userID.String(), true, string(account.TypeCreditCard))
+	return pkg.Paginate(baseQuery, pagination, "created_at DESC", toDomainAccount)
+}
 
-	baseQuery := r.DB.WithContext(ctx).Table("accounts").Where("user_id = ? AND is_active = ?", userID.String(), true)
-
-	var total int64
-	if err := baseQuery.Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-
-	var rows []accountDB
-	err := baseQuery.Order("created_at DESC").
-		Offset(pagination.Offset()).
-		Limit(pagination.Limit).
-		Find(&rows).Error
+func (r *AccountRepository) GetByCreditCardId(ctx context.Context, creditCardID, userID ulid.ULID) (*account.Account, error) {
+	var adb accountDB
+	err := r.DB.WithContext(ctx).Where("credit_card_id = ? AND user_id = ?", creditCardID.String(), userID.String()).First(&adb).Error
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
-
-	accounts := make([]*account.Account, 0, len(rows))
-	for i := range rows {
-		a, err := toDomainAccount(&rows[i])
-		if err != nil {
-			return nil, 0, err
-		}
-		accounts = append(accounts, a)
-	}
-	return accounts, total, nil
+	return toDomainAccount(&adb)
 }
 
 func (r *AccountRepository) UpdateBalance(ctx context.Context, accountID ulid.ULID, amount float64) error {

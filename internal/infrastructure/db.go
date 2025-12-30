@@ -4,6 +4,7 @@ import (
 	"Fynance/config"
 	"Fynance/internal/domain/account"
 	"Fynance/internal/domain/budget"
+	"Fynance/internal/domain/creditcard"
 	"Fynance/internal/domain/goal"
 	"Fynance/internal/domain/investment"
 	"Fynance/internal/domain/recurring"
@@ -57,6 +58,10 @@ func runMigrations(db *gorm.DB) error {
 		logger.Warn().Err(err).Msg("Aviso ao remover constraint única do campo name da tabela users")
 	}
 
+	if err := fixBudgetMonthYearTypes(db); err != nil {
+		logger.Warn().Err(err).Msg("Aviso ao corrigir tipos das colunas month e year da tabela budgets")
+	}
+
 	entities := []interface{}{
 		&user.User{},
 		&goal.Goal{},
@@ -67,6 +72,9 @@ func runMigrations(db *gorm.DB) error {
 		&account.Account{},
 		&budget.Budget{},
 		&recurring.RecurringTransaction{},
+		&creditcard.CreditCard{},
+		&creditcard.Invoice{},
+		&creditcard.CreditCardTransaction{},
 	}
 
 	for _, entity := range entities {
@@ -135,6 +143,49 @@ func removeUniqueConstraintOnUserName(db *gorm.DB) error {
 	return nil
 }
 
+func fixBudgetMonthYearTypes(db *gorm.DB) error {
+	sqlDB, err := db.DB()
+	if err != nil {
+		return err
+	}
+
+	checkQuery := `
+		SELECT data_type 
+		FROM information_schema.columns 
+		WHERE table_name = 'budgets' 
+		AND column_name = 'year'
+	`
+
+	var dataType string
+	err = sqlDB.QueryRow(checkQuery).Scan(&dataType)
+	if err != nil {
+		return nil
+	}
+
+	if dataType == "numeric" || dataType == "decimal" {
+		logger.Info().Msg("Corrigindo tipos das colunas month e year na tabela budgets...")
+
+		queries := []string{
+			`ALTER TABLE budgets ALTER COLUMN month TYPE integer USING month::integer`,
+			`ALTER TABLE budgets ALTER COLUMN year TYPE integer USING year::integer`,
+		}
+
+		for _, query := range queries {
+			if _, err := sqlDB.Exec(query); err != nil {
+				logger.Warn().
+					Err(err).
+					Str("query", query).
+					Msg("Erro ao executar migração de tipos")
+				return err
+			}
+		}
+
+		logger.Info().Msg("Tipos das colunas month e year corrigidos com sucesso!")
+	}
+
+	return nil
+}
+
 func getEntityName(entity interface{}) string {
 	switch entity.(type) {
 	case *user.User:
@@ -155,6 +206,12 @@ func getEntityName(entity interface{}) string {
 		return "Budget"
 	case *recurring.RecurringTransaction:
 		return "RecurringTransaction"
+	case *creditcard.CreditCard:
+		return "CreditCard"
+	case *creditcard.Invoice:
+		return "Invoice"
+	case *creditcard.CreditCardTransaction:
+		return "CreditCardTransaction"
 	default:
 		return "Unknown"
 	}

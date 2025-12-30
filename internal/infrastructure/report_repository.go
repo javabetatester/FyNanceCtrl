@@ -147,16 +147,16 @@ func (r *ReportRepository) getDailyBalance(userID ulid.ULID, startDate, endDate 
 
 func (r *ReportRepository) getTopExpenses(userID ulid.ULID, startDate, endDate time.Time, limit int) []report.TransactionItem {
 	type result struct {
-		Id          string
-		Description string
-		Amount      float64
-		CategoryId  string
-		Date        time.Time
+		Id           string
+		Description  string
+		Amount       float64
+		CategoryName string `gorm:"column:category_name"`
+		Date         time.Time
 	}
 
 	var results []result
 	r.DB.Table("transactions t").
-		Select("t.id, t.description, t.amount, c.name as category_id, t.date").
+		Select("t.id, t.description, t.amount, c.name as category_name, t.date").
 		Joins("LEFT JOIN categories c ON t.category_id = c.id").
 		Where("t.user_id = ? AND t.type = ? AND t.date BETWEEN ? AND ?", userID.String(), "EXPENSE", startDate, endDate).
 		Order("t.amount DESC").
@@ -173,7 +173,7 @@ func (r *ReportRepository) getTopExpenses(userID ulid.ULID, startDate, endDate t
 			Id:          id,
 			Description: res.Description,
 			Amount:      res.Amount,
-			Category:    res.CategoryId,
+			Category:    res.CategoryName,
 			Date:        res.Date,
 		})
 	}

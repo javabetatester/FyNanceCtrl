@@ -4,6 +4,8 @@ import (
 	"Fynance/internal/domain/transaction"
 	"Fynance/internal/pkg"
 	"context"
+	"errors"
+	"strings"
 	"time"
 
 	"github.com/oklog/ulid/v2"
@@ -142,11 +144,51 @@ func (r *TransactionCategoryRepository) GetByUserID(ctx context.Context, userID 
 
 func (r *TransactionCategoryRepository) GetByName(ctx context.Context, CategoryName string, userID ulid.ULID) (*transaction.Category, error) {
 	var row categoryDB
-	err := r.DB.WithContext(ctx).Table("categories").Where("name = ? AND user_id = ?", CategoryName, userID.String()).First(&row).Error
+	searchName := strings.TrimSpace(CategoryName)
+	searchLower := strings.ToLower(searchName)
+
+	err := r.DB.WithContext(ctx).Table("categories").
+		Where("user_id = ? AND (LOWER(TRIM(name)) = ? OR name = ?)", userID.String(), searchLower, searchName).
+		First(&row).Error
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			var allRows []categoryDB
+			err2 := r.DB.WithContext(ctx).Table("categories").
+				Where("user_id = ?", userID.String()).
+				Find(&allRows).Error
+			if err2 != nil {
+				return nil, err
+			}
+
+			for _, r := range allRows {
+				if strings.ToLower(strings.TrimSpace(r.Name)) == searchLower {
+					return toDomainCategory(&r)
+				}
+			}
+		}
 		return nil, err
 	}
 	return toDomainCategory(&row)
+}
+
+func (r *TransactionCategoryRepository) GetAllWithoutLimit(ctx context.Context, userID ulid.ULID) ([]*transaction.Category, error) {
+	var rows []categoryDB
+	err := r.DB.WithContext(ctx).Table("categories").
+		Where("user_id = ?", userID.String()).
+		Order("name ASC").
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*transaction.Category, 0, len(rows))
+	for i := range rows {
+		c, err := toDomainCategory(&rows[i])
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, nil
 }
 
 func (r *TransactionCategoryRepository) BelongsToUser(ctx context.Context, categoryID ulid.ULID, userID ulid.ULID) (bool, error) {

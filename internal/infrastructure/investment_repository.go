@@ -76,13 +76,17 @@ func (r *InvestmentRepository) Create(ctx context.Context, inv *investment.Inves
 	return nil
 }
 
-func (r *InvestmentRepository) List(ctx context.Context, userId ulid.ULID, pagination *pkg.PaginationParams) ([]*investment.Investment, int64, error) {
+func (r *InvestmentRepository) List(ctx context.Context, userId ulid.ULID, filters *investment.InvestmentFilters, pagination *pkg.PaginationParams) ([]*investment.Investment, int64, error) {
 	if pagination == nil {
 		pagination = &pkg.PaginationParams{Page: 1, Limit: 10}
 	}
 	pagination.Normalize()
 
 	baseQuery := r.DB.WithContext(ctx).Table("investments").Where("user_id = ?", userId.String())
+
+	if filters != nil && filters.Type != nil && *filters.Type != "" && *filters.Type != "ALL" {
+		baseQuery = baseQuery.Where("type = ?", *filters.Type)
+	}
 
 	var total int64
 	if err := baseQuery.Count(&total).Error; err != nil {

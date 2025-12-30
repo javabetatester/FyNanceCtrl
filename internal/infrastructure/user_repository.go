@@ -21,6 +21,7 @@ type userDB struct {
 	Id        string    `gorm:"type:varchar(26);primaryKey"`
 	Name      string    `gorm:"type:varchar(100);not null"`
 	Email     string    `gorm:"type:varchar(100);uniqueIndex:idx_users_email;not null"`
+	Phone     string    `gorm:"type:varchar(20)"`
 	Password  string    `gorm:"type:varchar(255);not null"`
 	CreatedAt time.Time `gorm:"autoCreateTime;not null"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime;not null"`
@@ -42,6 +43,7 @@ func toDomainUser(udb *userDB) (*user.User, error) {
 		Id:        id,
 		Name:      udb.Name,
 		Email:     udb.Email,
+		Phone:     udb.Phone,
 		Password:  udb.Password,
 		CreatedAt: udb.CreatedAt,
 		UpdatedAt: udb.UpdatedAt,
@@ -55,6 +57,7 @@ func toDBUser(u *user.User) *userDB {
 		Id:        u.Id.String(),
 		Name:      u.Name,
 		Email:     u.Email,
+		Phone:     u.Phone,
 		Password:  u.Password,
 		CreatedAt: u.CreatedAt,
 		UpdatedAt: u.UpdatedAt,

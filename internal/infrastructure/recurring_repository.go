@@ -16,23 +16,24 @@ type RecurringRepository struct {
 }
 
 type recurringDB struct {
-	Id            string     `gorm:"type:varchar(26);primaryKey"`
-	UserId        string     `gorm:"type:varchar(26);index;not null"`
-	Type          string     `gorm:"type:varchar(15);not null"`
-	CategoryId    string     `gorm:"type:varchar(26);index"`
-	AccountId     *string    `gorm:"type:varchar(26);index"`
-	Amount        float64    `gorm:"type:decimal(15,2);not null"`
-	Description   string     `gorm:"type:varchar(255)"`
-	Frequency     string     `gorm:"type:varchar(20);not null"`
-	DayOfMonth    int        `gorm:"default:1"`
-	DayOfWeek     int        `gorm:"default:0"`
-	StartDate     time.Time  `gorm:"type:date;not null"`
-	EndDate       *time.Time `gorm:"type:date"`
-	LastProcessed *time.Time `gorm:"type:date"`
-	NextDue       time.Time  `gorm:"type:date;not null"`
-	IsActive      bool       `gorm:"not null;default:true"`
-	CreatedAt     time.Time  `gorm:"not null"`
-	UpdatedAt     time.Time  `gorm:"not null"`
+	Id            string     `gorm:"type:varchar(26);primaryKey;column:id"`
+	UserId        string     `gorm:"type:varchar(26);index;not null;column:user_id"`
+	Type          string     `gorm:"type:varchar(15);not null;column:type"`
+	CategoryId    string     `gorm:"type:varchar(26);index;column:category_id"`
+	CategoryName  string     `gorm:"->;column:category_name"`
+	AccountId     *string    `gorm:"type:varchar(26);index;column:account_id"`
+	Amount        float64    `gorm:"type:decimal(15,2);not null;column:amount"`
+	Description   string     `gorm:"type:varchar(255);column:description"`
+	Frequency     string     `gorm:"type:varchar(20);not null;column:frequency"`
+	DayOfMonth    int        `gorm:"default:1;column:day_of_month"`
+	DayOfWeek     int        `gorm:"default:0;column:day_of_week"`
+	StartDate     time.Time  `gorm:"type:date;not null;column:start_date"`
+	EndDate       *time.Time `gorm:"type:date;column:end_date"`
+	LastProcessed *time.Time `gorm:"type:date;column:last_processed"`
+	NextDue       time.Time  `gorm:"type:date;not null;column:next_due"`
+	IsActive      bool       `gorm:"not null;default:true;column:is_active"`
+	CreatedAt     time.Time  `gorm:"not null;column:created_at"`
+	UpdatedAt     time.Time  `gorm:"not null;column:updated_at"`
 }
 
 func (recurringDB) TableName() string {
@@ -64,7 +65,7 @@ func toDomainRecurring(rdb *recurringDB) (*recurring.RecurringTransaction, error
 		accountID = &parsed
 	}
 
-	return &recurring.RecurringTransaction{
+	rec := &recurring.RecurringTransaction{
 		Id:            id,
 		UserId:        userID,
 		Type:          rdb.Type,
@@ -82,7 +83,11 @@ func toDomainRecurring(rdb *recurringDB) (*recurring.RecurringTransaction, error
 		IsActive:      rdb.IsActive,
 		CreatedAt:     rdb.CreatedAt,
 		UpdatedAt:     rdb.UpdatedAt,
-	}, nil
+	}
+	if rdb.CategoryName != "" {
+		rec.CategoryName = rdb.CategoryName
+	}
+	return rec, nil
 }
 
 func toDBRecurring(r *recurring.RecurringTransaction) *recurringDB {
@@ -129,11 +134,24 @@ func (r *RecurringRepository) Delete(ctx context.Context, recurringID, userID ul
 
 func (r *RecurringRepository) GetById(ctx context.Context, recurringID, userID ulid.ULID) (*recurring.RecurringTransaction, error) {
 	var rdb recurringDB
-	err := r.DB.WithContext(ctx).Where("id = ? AND user_id = ?", recurringID.String(), userID.String()).First(&rdb).Error
+	err := r.DB.WithContext(ctx).
+		Table("recurring_transactions r").
+		Select("r.*, c.name as category_name").
+		Joins("LEFT JOIN categories c ON r.category_id = c.id").
+		Where("r.id = ? AND r.user_id = ?", recurringID.String(), userID.String()).
+		Order("r.id").
+		First(&rdb).Error
 	if err != nil {
 		return nil, err
 	}
-	return toDomainRecurring(&rdb)
+	rec, err := toDomainRecurring(&rdb)
+	if err != nil {
+		return nil, err
+	}
+	if rdb.CategoryName != "" {
+		rec.CategoryName = rdb.CategoryName
+	}
+	return rec, nil
 }
 
 func (r *RecurringRepository) GetByUserId(ctx context.Context, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*recurring.RecurringTransaction, int64, error) {
@@ -142,15 +160,20 @@ func (r *RecurringRepository) GetByUserId(ctx context.Context, userID ulid.ULID,
 	}
 	pagination.Normalize()
 
-	baseQuery := r.DB.WithContext(ctx).Table("recurring_transactions").Where("user_id = ?", userID.String())
+	countQuery := r.DB.WithContext(ctx).Table("recurring_transactions r").Where("r.user_id = ?", userID.String())
+	dataQuery := r.DB.WithContext(ctx).
+		Table("recurring_transactions r").
+		Select("r.*, c.name as category_name").
+		Joins("LEFT JOIN categories c ON r.category_id = c.id").
+		Where("r.user_id = ?", userID.String())
 
 	var total int64
-	if err := baseQuery.Count(&total).Error; err != nil {
+	if err := countQuery.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
 	var rows []recurringDB
-	err := baseQuery.Order("created_at DESC").
+	err := dataQuery.Order("r.created_at DESC").
 		Offset(pagination.Offset()).
 		Limit(pagination.Limit).
 		Find(&rows).Error
@@ -162,7 +185,7 @@ func (r *RecurringRepository) GetByUserId(ctx context.Context, userID ulid.ULID,
 	for i := range rows {
 		t, err := toDomainRecurring(&rows[i])
 		if err != nil {
-			return nil, 0, err
+			continue
 		}
 		transactions = append(transactions, t)
 	}

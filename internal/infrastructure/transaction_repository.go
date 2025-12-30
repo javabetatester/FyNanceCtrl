@@ -1,10 +1,12 @@
 package infrastructure
 
 import (
-	"Fynance/internal/domain/transaction"
-	"Fynance/internal/pkg"
 	"context"
 	"time"
+
+	"Fynance/internal/domain/transaction"
+	"Fynance/internal/pkg"
+	"Fynance/internal/pkg/query"
 
 	"github.com/oklog/ulid/v2"
 	"gorm.io/gorm"
@@ -15,20 +17,25 @@ type TransactionRepository struct {
 }
 
 type transactionDB struct {
-	Id           string    `gorm:"type:varchar(26);primaryKey"`
-	UserId       string    `gorm:"type:varchar(26);index;not null"`
-	AccountId    string    `gorm:"type:varchar(26);index;not null"`
-	Type         string    `gorm:"type:varchar(15);not null"`
-	CategoryId   string    `gorm:"type:varchar(26);index"`
-	InvestmentId *string   `gorm:"type:varchar(26);index"`
-	Amount       float64   `gorm:"not null"`
-	Description  string    `gorm:"size:255"`
-	Date         time.Time `gorm:"not null"`
-	CreatedAt    time.Time `gorm:"not null"`
-	UpdatedAt    time.Time `gorm:"not null"`
+	Id           string    `gorm:"type:varchar(26);primaryKey;column:id"`
+	UserId       string    `gorm:"type:varchar(26);index;not null;column:user_id"`
+	AccountId    string    `gorm:"type:varchar(26);index;not null;column:account_id"`
+	Type         string    `gorm:"type:varchar(15);not null;column:type"`
+	CategoryId   *string   `gorm:"type:varchar(26);index;column:category_id"`
+	CategoryName string    `gorm:"->;column:category_name"`
+	InvestmentId *string   `gorm:"type:varchar(26);index;column:investment_id"`
+	Amount       float64   `gorm:"not null;column:amount"`
+	Description  string    `gorm:"size:255;column:description"`
+	Date         time.Time `gorm:"not null;column:date"`
+	CreatedAt    time.Time `gorm:"not null;column:created_at"`
+	UpdatedAt    time.Time `gorm:"not null;column:updated_at"`
 }
 
 func toDomainTransaction(tdb *transactionDB) (*transaction.Transaction, error) {
+	return toDomainTransactionWithCategory(tdb)
+}
+
+func toDomainTransactionWithCategory(tdb *transactionDB) (*transaction.Transaction, error) {
 	id, err := pkg.ParseULID(tdb.Id)
 	if err != nil {
 		return nil, err
@@ -41,9 +48,13 @@ func toDomainTransaction(tdb *transactionDB) (*transaction.Transaction, error) {
 	if err != nil {
 		return nil, err
 	}
-	cid, err := pkg.ParseULID(tdb.CategoryId)
-	if err != nil {
-		return nil, err
+	var cid *ulid.ULID
+	if tdb.CategoryId != nil && *tdb.CategoryId != "" {
+		parsed, err := pkg.ParseULID(*tdb.CategoryId)
+		if err != nil {
+			return nil, err
+		}
+		cid = &parsed
 	}
 
 	var invID *ulid.ULID
@@ -55,7 +66,7 @@ func toDomainTransaction(tdb *transactionDB) (*transaction.Transaction, error) {
 		invID = &parsed
 	}
 
-	return &transaction.Transaction{
+	tx := &transaction.Transaction{
 		Id:           id,
 		UserId:       uid,
 		AccountId:    aid,
@@ -67,7 +78,13 @@ func toDomainTransaction(tdb *transactionDB) (*transaction.Transaction, error) {
 		Date:         tdb.Date,
 		CreatedAt:    tdb.CreatedAt,
 		UpdatedAt:    tdb.UpdatedAt,
-	}, nil
+	}
+
+	if tdb.CategoryName != "" {
+		tx.CategoryName = tdb.CategoryName
+	}
+
+	return tx, nil
 }
 
 func toDBTransaction(t *transaction.Transaction) *transactionDB {
@@ -76,12 +93,17 @@ func toDBTransaction(t *transaction.Transaction) *transactionDB {
 		s := t.InvestmentId.String()
 		invID = &s
 	}
+	var categoryID *string
+	if t.CategoryId != nil {
+		s := t.CategoryId.String()
+		categoryID = &s
+	}
 	return &transactionDB{
 		Id:           t.Id.String(),
 		UserId:       t.UserId.String(),
 		AccountId:    t.AccountId.String(),
 		Type:         string(t.Type),
-		CategoryId:   t.CategoryId.String(),
+		CategoryId:   categoryID,
 		InvestmentId: invID,
 		Amount:       t.Amount,
 		Description:  t.Description,
@@ -107,7 +129,11 @@ func (r *TransactionRepository) Delete(ctx context.Context, transactionID ulid.U
 
 func (r *TransactionRepository) GetByID(ctx context.Context, transactionID ulid.ULID) (*transaction.Transaction, error) {
 	var tdb transactionDB
-	err := r.DB.WithContext(ctx).Table("transactions").Where("id = ?", transactionID.String()).First(&tdb).Error
+	err := r.DB.WithContext(ctx).Table("transactions t").
+		Select("t.*, c.name as category_name").
+		Joins("LEFT JOIN categories c ON t.category_id = c.id").
+		Where("t.id = ?", transactionID.String()).
+		First(&tdb).Error
 	if err != nil {
 		return nil, err
 	}
@@ -116,114 +142,180 @@ func (r *TransactionRepository) GetByID(ctx context.Context, transactionID ulid.
 
 func (r *TransactionRepository) GetByIDAndUser(ctx context.Context, transactionID, userID ulid.ULID) (*transaction.Transaction, error) {
 	var tdb transactionDB
-	err := r.DB.WithContext(ctx).Table("transactions").Where("id = ? AND user_id = ?", transactionID.String(), userID.String()).First(&tdb).Error
+	err := r.DB.WithContext(ctx).Table("transactions t").
+		Select("t.*, c.name as category_name").
+		Joins("LEFT JOIN categories c ON t.category_id = c.id").
+		Where("t.id = ? AND t.user_id = ?", transactionID.String(), userID.String()).
+		First(&tdb).Error
 	if err != nil {
 		return nil, err
 	}
 	return toDomainTransaction(&tdb)
 }
 
-func (r *TransactionRepository) GetAll(ctx context.Context, userID ulid.ULID, accountID *ulid.ULID, pagination *pkg.PaginationParams) ([]*transaction.Transaction, int64, error) {
-	baseQuery := r.DB.WithContext(ctx).Table("transactions").Where("user_id = ?", userID.String())
+func (r *TransactionRepository) FindByUser(ctx context.Context, userID ulid.ULID) *query.Query[transactionDB] {
+	return query.New[transactionDB](r.DB, "transactions").
+		Context(ctx).
+		Where("user_id = ?", userID.String()).
+		Order("date DESC, created_at DESC")
+}
+
+func (r *TransactionRepository) FindByUserAndAccount(ctx context.Context, userID, accountID ulid.ULID) *query.Query[transactionDB] {
+	return query.New[transactionDB](r.DB, "transactions").
+		Context(ctx).
+		Where("user_id = ? AND account_id = ?", userID.String(), accountID.String()).
+		Order("date DESC, created_at DESC")
+}
+
+func (r *TransactionRepository) Converter() func(*transactionDB) (*transaction.Transaction, error) {
+	return toDomainTransaction
+}
+
+func (r *TransactionRepository) GetAll(ctx context.Context, userID ulid.ULID, accountID *ulid.ULID, filters *transaction.TransactionFilters, pagination *pkg.PaginationParams) ([]*transaction.Transaction, int64, error) {
+	countQuery := r.DB.WithContext(ctx).Table("transactions t").Where("t.user_id = ?", userID.String())
+	dataQuery := r.DB.WithContext(ctx).Table("transactions t").
+		Select("t.*, c.name as category_name").
+		Joins("LEFT JOIN categories c ON t.category_id = c.id").
+		Where("t.user_id = ?", userID.String())
+
 	if accountID != nil {
-		baseQuery = baseQuery.Where("account_id = ?", accountID.String())
+		countQuery = countQuery.Where("t.account_id = ?", accountID.String())
+		dataQuery = dataQuery.Where("t.account_id = ?", accountID.String())
 	}
-	return pkg.Paginate(baseQuery, pagination, "date DESC, created_at DESC", toDomainTransaction)
+
+	if filters != nil {
+		if filters.Type != nil && *filters.Type != "" && *filters.Type != "ALL" {
+			countQuery = countQuery.Where("t.type = ?", *filters.Type)
+			dataQuery = dataQuery.Where("t.type = ?", *filters.Type)
+		}
+
+		if filters.CategoryID != nil {
+			countQuery = countQuery.Where("t.category_id = ?", filters.CategoryID.String())
+			dataQuery = dataQuery.Where("t.category_id = ?", filters.CategoryID.String())
+		}
+
+		if filters.Search != nil && *filters.Search != "" {
+			searchPattern := "%" + *filters.Search + "%"
+			countQuery = countQuery.Where("t.description ILIKE ?", searchPattern)
+			dataQuery = dataQuery.Where("t.description ILIKE ?", searchPattern)
+		}
+
+		if filters.DateFrom != nil {
+			countQuery = countQuery.Where("t.date >= ?", *filters.DateFrom)
+			dataQuery = dataQuery.Where("t.date >= ?", *filters.DateFrom)
+		}
+
+		if filters.DateTo != nil {
+			countQuery = countQuery.Where("t.date <= ?", *filters.DateTo)
+			dataQuery = dataQuery.Where("t.date <= ?", *filters.DateTo)
+		}
+	}
+
+	pagination = pkg.NormalizePagination(pagination)
+
+	var total int64
+	if err := countQuery.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var rows []transactionDB
+	err := dataQuery.Order("t.date DESC, t.created_at DESC").
+		Offset(pagination.Offset()).
+		Limit(pagination.Limit).
+		Find(&rows).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	out := make([]*transaction.Transaction, 0, len(rows))
+	for i := range rows {
+		item, err := toDomainTransaction(&rows[i])
+		if err != nil {
+			continue
+		}
+		out = append(out, item)
+	}
+
+	return out, total, nil
 }
 
 func (r *TransactionRepository) GetByAmount(ctx context.Context, amount float64, pagination *pkg.PaginationParams) ([]*transaction.Transaction, int64, error) {
-	if pagination == nil {
-		pagination = &pkg.PaginationParams{Page: 1, Limit: 10}
-	}
-	pagination.Normalize()
-
 	baseQuery := r.DB.WithContext(ctx).Table("transactions").Where("amount = ?", amount)
-
-	var total int64
-	if err := baseQuery.Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-
-	var rows []transactionDB
-	err := baseQuery.Order("date DESC, created_at DESC").
-		Offset(pagination.Offset()).
-		Limit(pagination.Limit).
-		Find(&rows).Error
-	if err != nil {
-		return nil, 0, err
-	}
-	out := make([]*transaction.Transaction, 0, len(rows))
-	for i := range rows {
-		t, err := toDomainTransaction(&rows[i])
-		if err != nil {
-			return nil, 0, err
-		}
-		out = append(out, t)
-	}
-	return out, total, nil
+	return pkg.Paginate(baseQuery, pagination, "date DESC, created_at DESC", toDomainTransaction)
 }
 
 func (r *TransactionRepository) GetByName(ctx context.Context, name string, pagination *pkg.PaginationParams) ([]*transaction.Transaction, int64, error) {
-	if pagination == nil {
-		pagination = &pkg.PaginationParams{Page: 1, Limit: 10}
-	}
-	pagination.Normalize()
-
 	baseQuery := r.DB.WithContext(ctx).Table("transactions").Where("description LIKE ?", "%"+name+"%")
-
-	var total int64
-	if err := baseQuery.Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-
-	var rows []transactionDB
-	err := baseQuery.Order("date DESC, created_at DESC").
-		Offset(pagination.Offset()).
-		Limit(pagination.Limit).
-		Find(&rows).Error
-	if err != nil {
-		return nil, 0, err
-	}
-	out := make([]*transaction.Transaction, 0, len(rows))
-	for i := range rows {
-		t, err := toDomainTransaction(&rows[i])
-		if err != nil {
-			return nil, 0, err
-		}
-		out = append(out, t)
-	}
-	return out, total, nil
+	return pkg.Paginate(baseQuery, pagination, "date DESC, created_at DESC", toDomainTransaction)
 }
 
 func (r *TransactionRepository) GetByCategory(ctx context.Context, categoryID ulid.ULID, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*transaction.Transaction, int64, error) {
-	if pagination == nil {
-		pagination = &pkg.PaginationParams{Page: 1, Limit: 10}
-	}
-	pagination.Normalize()
+	countQuery := r.DB.WithContext(ctx).Table("transactions t").Where("t.user_id = ? AND t.category_id = ?", userID.String(), categoryID.String())
+	dataQuery := r.DB.WithContext(ctx).Table("transactions t").
+		Select("t.*, c.name as category_name").
+		Joins("LEFT JOIN categories c ON t.category_id = c.id").
+		Where("t.user_id = ? AND t.category_id = ?", userID.String(), categoryID.String())
 
-	baseQuery := r.DB.WithContext(ctx).Table("transactions").Where("user_id = ? AND category_id = ?", userID.String(), categoryID.String())
+	pagination = pkg.NormalizePagination(pagination)
 
 	var total int64
-	if err := baseQuery.Count(&total).Error; err != nil {
+	if err := countQuery.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
 	var rows []transactionDB
-	err := baseQuery.Order("date DESC, created_at DESC").
+	err := dataQuery.Order("t.date DESC, t.created_at DESC").
 		Offset(pagination.Offset()).
 		Limit(pagination.Limit).
 		Find(&rows).Error
 	if err != nil {
 		return nil, 0, err
 	}
+
 	out := make([]*transaction.Transaction, 0, len(rows))
 	for i := range rows {
-		t, err := toDomainTransaction(&rows[i])
+		item, err := toDomainTransaction(&rows[i])
 		if err != nil {
-			return nil, 0, err
+			continue
 		}
-		out = append(out, t)
+		out = append(out, item)
 	}
+
+	return out, total, nil
+}
+
+func (r *TransactionRepository) GetByInvestmentId(ctx context.Context, investmentID ulid.ULID, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*transaction.Transaction, int64, error) {
+	countQuery := r.DB.WithContext(ctx).Table("transactions t").Where("t.investment_id = ? AND t.user_id = ?", investmentID.String(), userID.String())
+	dataQuery := r.DB.WithContext(ctx).Table("transactions t").
+		Select("t.*, c.name as category_name").
+		Joins("LEFT JOIN categories c ON t.category_id = c.id").
+		Where("t.investment_id = ? AND t.user_id = ?", investmentID.String(), userID.String())
+
+	pagination = pkg.NormalizePagination(pagination)
+
+	var total int64
+	if err := countQuery.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var rows []transactionDB
+	err := dataQuery.Order("t.date DESC, t.created_at DESC").
+		Offset(pagination.Offset()).
+		Limit(pagination.Limit).
+		Find(&rows).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	out := make([]*transaction.Transaction, 0, len(rows))
+	for i := range rows {
+		item, err := toDomainTransaction(&rows[i])
+		if err != nil {
+			continue
+		}
+		out = append(out, item)
+	}
+
 	return out, total, nil
 }
 
@@ -231,36 +323,4 @@ func (r *TransactionRepository) GetNumberOfTransactions(ctx context.Context, use
 	var count int64
 	err := r.DB.WithContext(ctx).Model(&transaction.Transaction{}).Where("user_id = ?", userID.String()).Count(&count).Error
 	return count, err
-}
-
-func (r *TransactionRepository) GetByInvestmentId(ctx context.Context, investmentID ulid.ULID, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*transaction.Transaction, int64, error) {
-	if pagination == nil {
-		pagination = &pkg.PaginationParams{Page: 1, Limit: 10}
-	}
-	pagination.Normalize()
-
-	baseQuery := r.DB.WithContext(ctx).Table("transactions").Where("investment_id = ? AND user_id = ?", investmentID.String(), userID.String())
-
-	var total int64
-	if err := baseQuery.Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-
-	var rows []transactionDB
-	err := baseQuery.Order("date DESC, created_at DESC").
-		Offset(pagination.Offset()).
-		Limit(pagination.Limit).
-		Find(&rows).Error
-	if err != nil {
-		return nil, 0, err
-	}
-	out := make([]*transaction.Transaction, 0, len(rows))
-	for i := range rows {
-		t, err := toDomainTransaction(&rows[i])
-		if err != nil {
-			return nil, 0, err
-		}
-		out = append(out, t)
-	}
-	return out, total, nil
 }

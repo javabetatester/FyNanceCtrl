@@ -109,13 +109,17 @@ func (r *GoalRepository) GetByIdAndUser(ctx context.Context, id, userID ulid.ULI
 	return toDomainGoal(&gdb)
 }
 
-func (r *GoalRepository) GetByUserId(ctx context.Context, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*goal.Goal, int64, error) {
+func (r *GoalRepository) GetByUserId(ctx context.Context, userID ulid.ULID, filters *goal.GoalFilters, pagination *pkg.PaginationParams) ([]*goal.Goal, int64, error) {
 	if pagination == nil {
 		pagination = &pkg.PaginationParams{Page: 1, Limit: 10}
 	}
 	pagination.Normalize()
 
 	baseQuery := r.DB.WithContext(ctx).Table("goals").Where("user_id = ?", userID.String())
+
+	if filters != nil && filters.Status != nil {
+		baseQuery = baseQuery.Where("status = ?", string(*filters.Status))
+	}
 
 	var total int64
 	if err := baseQuery.Count(&total).Error; err != nil {
@@ -195,13 +199,15 @@ func (r *GoalRepository) CheckGoalBelongsToUser(ctx context.Context, goalID ulid
 }
 
 type contributionDB struct {
-	Id          string    `gorm:"type:varchar(26);primaryKey"`
-	GoalId      string    `gorm:"type:varchar(26);index;not null"`
-	UserId      string    `gorm:"type:varchar(26);index;not null"`
-	Type        string    `gorm:"type:varchar(20);not null"`
-	Amount      float64   `gorm:"type:decimal(15,2);not null"`
-	Description string    `gorm:"type:varchar(255)"`
-	CreatedAt   time.Time `gorm:"not null"`
+	Id            string    `gorm:"type:varchar(26);primaryKey"`
+	GoalId        string    `gorm:"type:varchar(26);index;not null"`
+	UserId        string    `gorm:"type:varchar(26);index;not null"`
+	AccountId     string    `gorm:"type:varchar(26);index;not null"`
+	TransactionId *string   `gorm:"type:varchar(26);index"`
+	Type          string    `gorm:"type:varchar(20);not null"`
+	Amount        float64   `gorm:"type:decimal(15,2);not null"`
+	Description   string    `gorm:"type:varchar(255)"`
+	CreatedAt     time.Time `gorm:"not null"`
 }
 
 func toDomainContribution(cdb *contributionDB) (*goal.Contribution, error) {
@@ -217,26 +223,48 @@ func toDomainContribution(cdb *contributionDB) (*goal.Contribution, error) {
 	if err != nil {
 		return nil, appErrors.ErrInternalServer.WithError(err)
 	}
+	aid, err := pkg.ParseULID(cdb.AccountId)
+	if err != nil {
+		return nil, appErrors.ErrInternalServer.WithError(err)
+	}
+
+	var transactionID *ulid.ULID
+	if cdb.TransactionId != nil && *cdb.TransactionId != "" {
+		tid, err := pkg.ParseULID(*cdb.TransactionId)
+		if err == nil {
+			transactionID = &tid
+		}
+	}
+
 	return &goal.Contribution{
-		Id:          id,
-		GoalId:      gid,
-		UserId:      uid,
-		Type:        goal.ContributionType(cdb.Type),
-		Amount:      cdb.Amount,
-		Description: cdb.Description,
-		CreatedAt:   cdb.CreatedAt,
+		Id:            id,
+		GoalId:        gid,
+		UserId:        uid,
+		AccountId:     aid,
+		TransactionId: transactionID,
+		Type:          goal.ContributionType(cdb.Type),
+		Amount:        cdb.Amount,
+		Description:   cdb.Description,
+		CreatedAt:     cdb.CreatedAt,
 	}, nil
 }
 
 func toDBContribution(c *goal.Contribution) *contributionDB {
+	var transactionID *string
+	if c.TransactionId != nil {
+		s := c.TransactionId.String()
+		transactionID = &s
+	}
 	return &contributionDB{
-		Id:          c.Id.String(),
-		GoalId:      c.GoalId.String(),
-		UserId:      c.UserId.String(),
-		Type:        string(c.Type),
-		Amount:      c.Amount,
-		Description: c.Description,
-		CreatedAt:   c.CreatedAt,
+		Id:            c.Id.String(),
+		GoalId:        c.GoalId.String(),
+		UserId:        c.UserId.String(),
+		AccountId:     c.AccountId.String(),
+		TransactionId: transactionID,
+		Type:          string(c.Type),
+		Amount:        c.Amount,
+		Description:   c.Description,
+		CreatedAt:     c.CreatedAt,
 	}
 }
 
@@ -265,6 +293,45 @@ func (r *GoalRepository) GetContributionsByGoalId(ctx context.Context, goalId ul
 		out = append(out, c)
 	}
 	return out, nil
+}
+
+func (r *GoalRepository) GetContributionById(ctx context.Context, contributionId ulid.ULID, userId ulid.ULID) (*goal.Contribution, error) {
+	var cdb contributionDB
+	if err := r.DB.WithContext(ctx).Table("goal_contributions").
+		Where("id = ? AND user_id = ?", contributionId.String(), userId.String()).
+		First(&cdb).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, appErrors.ErrNotFound.WithError(err)
+		}
+		return nil, appErrors.NewDatabaseError(err)
+	}
+	return toDomainContribution(&cdb)
+}
+
+func (r *GoalRepository) GetContributionByTransactionId(ctx context.Context, transactionId ulid.ULID, userId ulid.ULID) (*goal.Contribution, error) {
+	var cdb contributionDB
+	if err := r.DB.WithContext(ctx).Table("goal_contributions").
+		Where("transaction_id = ? AND user_id = ?", transactionId.String(), userId.String()).
+		First(&cdb).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, appErrors.NewDatabaseError(err)
+	}
+	return toDomainContribution(&cdb)
+}
+
+func (r *GoalRepository) DeleteContribution(ctx context.Context, contributionId ulid.ULID) error {
+	result := r.DB.WithContext(ctx).Table("goal_contributions").
+		Where("id = ?", contributionId.String()).
+		Delete(&contributionDB{})
+	if result.Error != nil {
+		return appErrors.NewDatabaseError(result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return appErrors.ErrNotFound
+	}
+	return nil
 }
 
 func (r *GoalRepository) UpdateCurrentAmount(ctx context.Context, goalId ulid.ULID, amount float64) error {
