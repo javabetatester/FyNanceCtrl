@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"Fynance/internal/domain/user"
+	"Fynance/internal/domain/shared"
 	appErrors "Fynance/internal/errors"
 	"Fynance/internal/pkg"
 
@@ -13,12 +13,21 @@ import (
 )
 
 type Service struct {
-	Repository  Repository
-	UserService *user.Service
+	Repository Repository
+	shared.BaseService
+}
+
+func NewService(repo Repository, userChecker *shared.UserCheckerService) *Service {
+	return &Service{
+		Repository: repo,
+		BaseService: shared.BaseService{
+			UserChecker: userChecker,
+		},
+	}
 }
 
 func (s *Service) CreateAccount(ctx context.Context, req *CreateAccountRequest) (*Account, error) {
-	if err := s.ensureUserExists(ctx, req.UserId); err != nil {
+	if err := s.EnsureUserExists(ctx, req.UserId); err != nil {
 		return nil, err
 	}
 
@@ -37,6 +46,7 @@ func (s *Service) CreateAccount(ctx context.Context, req *CreateAccountRequest) 
 		Icon:           req.Icon,
 		IncludeInTotal: req.IncludeInTotal,
 		IsActive:       true,
+		CreditCardId:   req.CreditCardId,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
@@ -97,7 +107,7 @@ func (s *Service) DeleteAccount(ctx context.Context, accountID, userID ulid.ULID
 	}
 
 	if account.Balance != 0 {
-		return appErrors.NewValidationError("account", "conta possui saldo e nao pode ser removida")
+		return appErrors.NewValidationError("account", "Conta possui saldo, não pode remover")
 	}
 
 	return s.Repository.Delete(ctx, accountID, userID)
@@ -117,7 +127,7 @@ func (s *Service) GetAccountByID(ctx context.Context, accountID, userID ulid.ULI
 }
 
 func (s *Service) ListAccounts(ctx context.Context, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*Account, int64, error) {
-	if err := s.ensureUserExists(ctx, userID); err != nil {
+	if err := s.EnsureUserExists(ctx, userID); err != nil {
 		return nil, 0, err
 	}
 
@@ -125,7 +135,7 @@ func (s *Service) ListAccounts(ctx context.Context, userID ulid.ULID, pagination
 }
 
 func (s *Service) ListActiveAccounts(ctx context.Context, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*Account, int64, error) {
-	if err := s.ensureUserExists(ctx, userID); err != nil {
+	if err := s.EnsureUserExists(ctx, userID); err != nil {
 		return nil, 0, err
 	}
 
@@ -140,14 +150,14 @@ func (s *Service) UpdateBalance(ctx context.Context, accountID, userID ulid.ULID
 
 	newBalance := account.Balance + amount
 	if account.Type != TypeCreditCard && newBalance < 0 {
-		return appErrors.NewValidationError("amount", "saldo insuficiente")
+		return appErrors.NewValidationError("amount", "Saldo insuficiente")
 	}
 
 	return s.Repository.UpdateBalance(ctx, accountID, amount)
 }
 
 func (s *Service) GetTotalBalance(ctx context.Context, userID ulid.ULID) (float64, error) {
-	if err := s.ensureUserExists(ctx, userID); err != nil {
+	if err := s.EnsureUserExists(ctx, userID); err != nil {
 		return 0, err
 	}
 
@@ -156,7 +166,7 @@ func (s *Service) GetTotalBalance(ctx context.Context, userID ulid.ULID) (float6
 
 func (s *Service) Transfer(ctx context.Context, fromAccountID, toAccountID, userID ulid.ULID, amount float64) error {
 	if amount <= 0 {
-		return appErrors.NewValidationError("amount", "valor deve ser maior que zero")
+		return appErrors.NewValidationError("amount", "Valor deve ser maior que zero")
 	}
 
 	fromAccount, err := s.GetAccountByID(ctx, fromAccountID, userID)
@@ -169,7 +179,7 @@ func (s *Service) Transfer(ctx context.Context, fromAccountID, toAccountID, user
 	}
 
 	if fromAccount.Type != TypeCreditCard && fromAccount.Balance < amount {
-		return appErrors.NewValidationError("amount", "saldo insuficiente na conta de origem")
+		return appErrors.NewValidationError("amount", "Saldo insuficiente na conta de origem")
 	}
 
 	tx, err := s.Repository.BeginTx(ctx)
@@ -208,19 +218,6 @@ func (s *Service) validateCreateRequest(req *CreateAccountRequest) error {
 	return nil
 }
 
-func (s *Service) ensureUserExists(ctx context.Context, userID ulid.ULID) error {
-	if s.UserService == nil {
-		return appErrors.ErrInternalServer
-	}
-
-	_, err := s.UserService.GetByID(ctx, userID)
-	if err != nil {
-		return appErrors.ErrUserNotFound.WithError(err)
-	}
-
-	return nil
-}
-
 type CreateAccountRequest struct {
 	UserId         ulid.ULID
 	Name           string
@@ -229,6 +226,7 @@ type CreateAccountRequest struct {
 	Color          string
 	Icon           string
 	IncludeInTotal bool
+	CreditCardId   *ulid.ULID
 }
 
 type UpdateAccountRequest struct {

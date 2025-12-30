@@ -16,6 +16,7 @@ type Account struct {
 	Icon           string      `gorm:"type:varchar(50)" json:"icon"`
 	IncludeInTotal bool        `gorm:"not null;default:true" json:"includeInTotal"`
 	IsActive       bool        `gorm:"not null;default:true;index:idx_accounts_active" json:"isActive"`
+	CreditCardId   *ulid.ULID  `gorm:"type:varchar(26);index:idx_accounts_credit_card_id" json:"creditCardId,omitempty"`
 	CreatedAt      time.Time   `gorm:"autoCreateTime;not null" json:"createdAt"`
 	UpdatedAt      time.Time   `gorm:"autoUpdateTime;not null" json:"updatedAt"`
 }
