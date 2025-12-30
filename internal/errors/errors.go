@@ -1,9 +1,11 @@
 package errors
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/go-playground/validator/v10"
 )
@@ -119,18 +121,28 @@ func FromError(err error) *AppError {
 		return ErrNotFound.WithError(err)
 	}
 
+	if errors.Is(err, context.Canceled) {
+		return WrapError(err, "REQUEST_CANCELED", "Requisição cancelada pelo cliente", http.StatusRequestTimeout)
+	}
+
 	return WrapError(err, "UNKNOWN_ERROR", "Erro desconhecido", http.StatusInternalServerError)
+}
+
+func NewAuthError(code, message string) *AppError {
+	return &AppError{
+		Code:       code,
+		Message:    message,
+		StatusCode: http.StatusUnauthorized,
+		Details:    make(map[string]interface{}),
+	}
 }
 
 func NewValidationError(field, message string) *AppError {
 	return &AppError{
 		Code:       "VALIDATION_ERROR",
-		Message:    fmt.Sprintf("Campo '%s': %s", field, message),
+		Message:    message,
 		StatusCode: http.StatusBadRequest,
-		Details: map[string]interface{}{
-			"field":   field,
-			"message": message,
-		},
+		Details:    make(map[string]interface{}),
 	}
 }
 
@@ -168,8 +180,9 @@ func ParseValidationErrors(err error) *AppError {
 
 	fieldErrors := make([]map[string]string, 0, len(validationErrors))
 	for _, fieldErr := range validationErrors {
+		translatedField := translateFieldName(fieldErr.Field())
 		fieldErrors = append(fieldErrors, map[string]string{
-			"field":   fieldErr.Field(),
+			"field":   translatedField,
 			"message": translateValidationError(fieldErr),
 		})
 	}
@@ -184,39 +197,66 @@ func ParseValidationErrors(err error) *AppError {
 	}
 }
 
+func translateFieldName(field string) string {
+	fieldLower := strings.ToLower(field)
+	fieldMap := map[string]string{
+		"amount":       "valor",
+		"account_id":   "conta",
+		"accountid":    "conta",
+		"category_id":  "categoria",
+		"categoryid":   "categoria",
+		"type":         "tipo",
+		"description":  "descrição",
+		"name":         "nome",
+		"email":        "email",
+		"password":     "senha",
+		"date":         "data",
+		"target":       "valor alvo",
+		"targetamount": "valor alvo",
+	}
+	if translated, ok := fieldMap[fieldLower]; ok {
+		return translated
+	}
+	return field
+}
+
 func translateValidationError(fe validator.FieldError) string {
+	fieldName := translateFieldName(fe.Field())
+
 	switch fe.Tag() {
 	case "required":
-		return "Campo obrigatório"
+		return fmt.Sprintf("%s é obrigatório", fieldName)
 	case "email":
 		return "Email inválido"
 	case "min":
-		return fmt.Sprintf("Deve ter no mínimo %s caracteres", fe.Param())
+		return fmt.Sprintf("%s deve ter no mínimo %s caracteres", fieldName, fe.Param())
 	case "max":
-		return fmt.Sprintf("Deve ter no máximo %s caracteres", fe.Param())
+		return fmt.Sprintf("%s deve ter no máximo %s caracteres", fieldName, fe.Param())
 	case "gte":
-		return fmt.Sprintf("Deve ser maior ou igual a %s", fe.Param())
+		return fmt.Sprintf("%s deve ser maior ou igual a %s", fieldName, fe.Param())
 	case "lte":
-		return fmt.Sprintf("Deve ser menor ou igual a %s", fe.Param())
+		return fmt.Sprintf("%s deve ser menor ou igual a %s", fieldName, fe.Param())
 	case "gt":
-		return fmt.Sprintf("Deve ser maior que %s", fe.Param())
+		return fmt.Sprintf("%s deve ser maior que %s", fieldName, fe.Param())
 	case "lt":
-		return fmt.Sprintf("Deve ser menor que %s", fe.Param())
+		return fmt.Sprintf("%s deve ser menor que %s", fieldName, fe.Param())
+	case "ne":
+		return fmt.Sprintf("%s deve ser diferente de %s", fieldName, fe.Param())
 	case "len":
-		return fmt.Sprintf("Deve ter exatamente %s caracteres", fe.Param())
+		return fmt.Sprintf("%s deve ter exatamente %s caracteres", fieldName, fe.Param())
 	case "oneof":
-		return fmt.Sprintf("Deve ser um dos valores: %s", fe.Param())
+		return fmt.Sprintf("%s deve ser um dos valores: %s", fieldName, fe.Param())
 	case "uuid":
-		return "UUID inválido"
+		return fmt.Sprintf("%s deve ser um UUID válido", fieldName)
 	case "url":
-		return "URL inválida"
+		return fmt.Sprintf("%s deve ser uma URL válida", fieldName)
 	case "datetime":
-		return "Data/hora inválida"
+		return fmt.Sprintf("%s deve ser uma data/hora válida", fieldName)
 	case "numeric":
-		return "Deve ser um valor numérico"
+		return fmt.Sprintf("%s deve ser um valor numérico", fieldName)
 	case "alphanum":
-		return "Deve conter apenas letras e números"
+		return fmt.Sprintf("%s deve conter apenas letras e números", fieldName)
 	default:
-		return fmt.Sprintf("Validação '%s' falhou", fe.Tag())
+		return fmt.Sprintf("Validação '%s' falhou para %s", fe.Tag(), fieldName)
 	}
 }
