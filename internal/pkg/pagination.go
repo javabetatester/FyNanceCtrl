@@ -29,8 +29,8 @@ func (p *PaginationParams) Normalize() {
 	if p.Limit < 1 {
 		p.Limit = 10
 	}
-	if p.Limit > 100 {
-		p.Limit = 100
+	if p.Limit > 1000 {
+		p.Limit = 1000
 	}
 }
 
@@ -51,11 +51,11 @@ func NormalizePagination(p *PaginationParams) *PaginationParams {
 }
 
 type PaginatedResponse[T any] struct {
-	Data       []T  `json:"data"`
-	Page       int  `json:"page"`
-	Limit      int  `json:"limit"`
+	Data       []T   `json:"data"`
+	Page       int   `json:"page"`
+	Limit      int   `json:"limit"`
 	Total      int64 `json:"total"`
-	TotalPages int  `json:"totalPages"`
+	TotalPages int   `json:"totalPages"`
 }
 
 func NewPaginatedResponse[T any](data []T, page, limit int, total int64) *PaginatedResponse[T] {
@@ -108,4 +108,3 @@ func Paginate[T any, D any](
 
 	return out, total, nil
 }
-
