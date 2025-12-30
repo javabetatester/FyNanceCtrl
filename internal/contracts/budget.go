@@ -27,6 +27,15 @@ type BudgetListResponse struct {
 	Total   int              `json:"total"`
 }
 
+type BudgetResponse struct {
+	*budget.Budget
+	Percentage   float64 `json:"percentage"`
+	Remaining    float64 `json:"remaining"`
+	SpentAmount  float64 `json:"spentAmount"`
+	BudgetAmount float64 `json:"budgetAmount"`
+	Status       string  `json:"status"`
+}
+
 type BudgetSingleResponse struct {
 	Budget *budget.Budget `json:"budget"`
 }

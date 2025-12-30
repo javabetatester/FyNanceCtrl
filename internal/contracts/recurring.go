@@ -25,6 +25,7 @@ type RecurringUpdateRequest struct {
 	Description *string    `json:"description" binding:"omitempty,max=255"`
 	IsActive    *bool      `json:"is_active" binding:"omitempty"`
 	EndDate     *time.Time `json:"end_date" binding:"omitempty"`
+	NextDue     *time.Time `json:"next_due" binding:"omitempty"`
 }
 
 type RecurringCreateResponse struct {
@@ -46,7 +47,7 @@ type RecurringProcessRequest struct {
 }
 
 type RecurringProcessResponse struct {
-	Message     string                      `json:"message"`
-	Transaction *transaction.Transaction   `json:"transaction"`
+	Message     string                          `json:"message"`
+	Transaction *transaction.Transaction        `json:"transaction"`
 	Recurring   *recurring.RecurringTransaction `json:"recurring"`
 }

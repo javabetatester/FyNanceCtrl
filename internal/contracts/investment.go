@@ -12,22 +12,22 @@ type InvestmentCreateRequest struct {
 }
 
 type InvestmentUpdateRequest struct {
-	Name       *string  `json:"name" binding:"omitempty"`
-	Type       *string  `json:"type" binding:"omitempty,oneof=CDB LCI LCA TESOURO_DIRETO ACOES FUNDOS CRIPTOMOEDAS PREVIDENCIA"`
-	ReturnRate *float64 `json:"return_rate" binding:"omitempty"`
+	Name           *string  `json:"name" binding:"omitempty"`
+	Type           *string  `json:"type" binding:"omitempty,oneof=CDB LCI LCA TESOURO_DIRETO ACOES FUNDOS CRIPTOMOEDAS PREVIDENCIA"`
+	CurrentBalance *float64 `json:"current_balance" binding:"omitempty,gt=0"`
 }
 
 type InvestmentContributionRequest struct {
 	AccountID   string  `json:"account_id" binding:"required"`
 	Amount      float64 `json:"amount" binding:"required,gt=0"`
-	CategoryID  string  `json:"category_id" binding:"required"`
+	CategoryID  string  `json:"category_id" binding:"omitempty"`
 	Description string  `json:"description" binding:"omitempty"`
 }
 
 type InvestmentWithdrawRequest struct {
 	AccountID   string  `json:"account_id" binding:"required"`
 	Amount      float64 `json:"amount" binding:"required,gt=0"`
-	CategoryID  string  `json:"category_id" binding:"required"`
+	CategoryID  string  `json:"category_id" binding:"omitempty"`
 	Description string  `json:"description" binding:"omitempty"`
 }
 

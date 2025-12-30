@@ -7,18 +7,19 @@ import (
 )
 
 type TransactionCreateRequest struct {
-	AccountID   string  `json:"account_id" binding:"required"`
-	Type        string  `json:"type" binding:"required,oneof=RECEIPT EXPENSE TRANSFER GOALS INVESTMENT WITHDRAW"`
-	CategoryID  string  `json:"category_id" binding:"required"`
-	Amount      float64 `json:"amount" binding:"required,gt=0"`
-	Description string  `json:"description" binding:"omitempty,max=255"`
+	AccountID   string     `json:"account_id" binding:"required"`
+	Type        string     `json:"type" binding:"required,oneof=RECEIPT EXPENSE TRANSFER GOALS INVESTMENT WITHDRAW"`
+	CategoryID  string     `json:"category_id" binding:"required"`
+	Amount      float64    `json:"amount" binding:"required,ne=0"`
+	Description string     `json:"description" binding:"omitempty,max=255"`
+	Date        *time.Time `json:"date"`
 }
 
 type TransactionUpdateRequest struct {
 	AccountID   string     `json:"account_id" binding:"required"`
 	Type        string     `json:"type" binding:"required,oneof=RECEIPT EXPENSE TRANSFER GOALS INVESTMENT WITHDRAW"`
 	CategoryID  string     `json:"category_id" binding:"required"`
-	Amount      float64    `json:"amount" binding:"required,gt=0"`
+	Amount      float64    `json:"amount" binding:"required,ne=0"`
 	Description string     `json:"description" binding:"omitempty,max=255"`
 	Date        *time.Time `json:"date"`
 }

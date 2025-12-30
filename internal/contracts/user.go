@@ -23,3 +23,12 @@ type UserPlanResponse struct {
 type UserDeletionResponse struct {
 	Message string `json:"message"`
 }
+
+type UserUpdateNameRequest struct {
+	Name string `json:"name" binding:"required"`
+}
+
+type UserUpdatePasswordRequest struct {
+	CurrentPassword string `json:"current_password" binding:"required"`
+	NewPassword     string `json:"new_password" binding:"required,min=8"`
+}
