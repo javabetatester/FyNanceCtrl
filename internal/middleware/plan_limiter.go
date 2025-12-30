@@ -1,13 +1,16 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 
 	"Fynance/internal/domain/plan"
 	"Fynance/internal/domain/user"
 	appErrors "Fynance/internal/errors"
+	"Fynance/internal/pkg"
 
 	"github.com/gin-gonic/gin"
+	"github.com/oklog/ulid/v2"
 )
 
 type ResourceCounter interface {
@@ -81,28 +84,32 @@ func RequireFeature(feature string) gin.HandlerFunc {
 	}
 }
 
-func CheckResourceLimit(resourceType string, counter ResourceCounter) gin.HandlerFunc {
+type UserService interface {
+	GetPlan(ctx context.Context, id ulid.ULID) (user.Plan, error)
+}
+
+func CheckResourceLimit(resourceType string, counter ResourceCounter, userService UserService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		planValue, exists := c.Get("plan")
-		if !exists {
-			c.Next()
-			return
-		}
-
-		userPlan, ok := planValue.(user.Plan)
-		if !ok {
-			c.Next()
-			return
-		}
-
 		userIDValue, exists := c.Get("user_id")
 		if !exists {
 			c.Next()
 			return
 		}
 
-		userID, ok := userIDValue.(string)
-		if !ok {
+		userIDStr, ok := userIDValue.(string)
+		if !ok || userIDStr == "" {
+			c.Next()
+			return
+		}
+
+		userID, err := pkg.ParseULID(userIDStr)
+		if err != nil {
+			c.Next()
+			return
+		}
+
+		userPlan, err := userService.GetPlan(c.Request.Context(), userID)
+		if err != nil {
 			c.Next()
 			return
 		}
@@ -111,33 +118,32 @@ func CheckResourceLimit(resourceType string, counter ResourceCounter) gin.Handle
 
 		var limit int
 		var count int64
-		var err error
 
 		switch resourceType {
 		case "transactions":
 			limit = limits.MaxTransactions
-			count, err = counter.CountTransactions(userID)
+			count, err = counter.CountTransactions(userIDStr)
 		case "categories":
 			limit = limits.MaxCategories
-			count, err = counter.CountCategories(userID)
+			count, err = counter.CountCategories(userIDStr)
 		case "accounts":
 			limit = limits.MaxAccounts
-			count, err = counter.CountAccounts(userID)
+			count, err = counter.CountAccounts(userIDStr)
 		case "goals":
 			limit = limits.MaxGoals
-			count, err = counter.CountGoals(userID)
+			count, err = counter.CountGoals(userIDStr)
 		case "investments":
 			limit = limits.MaxInvestments
-			count, err = counter.CountInvestments(userID)
+			count, err = counter.CountInvestments(userIDStr)
 		case "budgets":
 			limit = limits.MaxBudgets
-			count, err = counter.CountBudgets(userID)
+			count, err = counter.CountBudgets(userIDStr)
 		case "recurring":
 			limit = limits.MaxRecurring
-			count, err = counter.CountRecurring(userID)
+			count, err = counter.CountRecurring(userIDStr)
 		case "credit_cards":
 			limit = limits.MaxCreditCards
-			count, err = counter.CountCreditCards(userID)
+			count, err = counter.CountCreditCards(userIDStr)
 		default:
 			c.Next()
 			return
@@ -149,11 +155,32 @@ func CheckResourceLimit(resourceType string, counter ResourceCounter) gin.Handle
 		}
 
 		if !plan.IsUnlimited(limit) && int(count) >= limit {
-			appErr := appErrors.WrapError(nil, "PLAN_LIMIT_REACHED",
-				"Limite do plano atingido. Faca upgrade para criar mais recursos.",
-				http.StatusForbidden)
+			resourceNames := map[string]string{
+				"transactions": "transações",
+				"categories":   "categorias",
+				"accounts":     "contas",
+				"goals":        "metas",
+				"investments":  "investimentos",
+				"budgets":      "orçamentos",
+				"recurring":    "transações recorrentes",
+				"credit_cards": "cartões de crédito",
+			}
+			resourceName := resourceNames[resourceType]
+			if resourceName == "" {
+				resourceName = resourceType
+			}
+
+			message := "Você atingiu o limite de " + resourceName + " do seu plano atual"
+			if userPlan == user.PlanFree {
+				message += " (FREE). Faça upgrade para um plano superior e crie mais " + resourceName + "."
+			} else {
+				message += ". Faça upgrade para criar mais " + resourceName + "."
+			}
+
+			appErr := appErrors.WrapError(nil, "PLAN_LIMIT_REACHED", message, http.StatusForbidden)
 			appErr.Details = map[string]interface{}{
 				"resource":     resourceType,
+				"resourceName": resourceName,
 				"current":      count,
 				"limit":        limit,
 				"current_plan": string(userPlan),
