@@ -14,37 +14,43 @@ type PlanLimits struct {
 	HasDashboard     bool
 	HasReports       bool
 	HasExport        bool
+	HasNotifications bool
 	HasMultipleUsers bool
+	MaxMonthsHistory int
 }
 
 var Limits = map[user.Plan]PlanLimits{
 	user.PlanFree: {
-		MaxTransactions:  100,
-		MaxCategories:    10,
-		MaxAccounts:      2,
-		MaxGoals:         3,
-		MaxInvestments:   2,
-		MaxBudgets:       5,
-		MaxRecurring:     3,
-		MaxCreditCards:   1,
+		MaxTransactions:  45,
+		MaxCategories:    5,
+		MaxAccounts:      1,
+		MaxGoals:         1,
+		MaxInvestments:   0,
+		MaxBudgets:       1,
+		MaxRecurring:     1,
+		MaxCreditCards:   0,
 		HasDashboard:     true,
 		HasReports:       false,
 		HasExport:        false,
+		HasNotifications: false,
 		HasMultipleUsers: false,
+		MaxMonthsHistory: 2,
 	},
 	user.PlanBasic: {
-		MaxTransactions:  1000,
-		MaxCategories:    50,
-		MaxAccounts:      10,
-		MaxGoals:         20,
-		MaxInvestments:   20,
-		MaxBudgets:       50,
-		MaxRecurring:     20,
-		MaxCreditCards:   5,
+		MaxTransactions:  100,
+		MaxCategories:    15,
+		MaxAccounts:      2,
+		MaxGoals:         3,
+		MaxInvestments:   3,
+		MaxBudgets:       5,
+		MaxRecurring:     5,
+		MaxCreditCards:   1,
 		HasDashboard:     true,
 		HasReports:       true,
-		HasExport:        false,
+		HasExport:        true,
+		HasNotifications: true,
 		HasMultipleUsers: false,
+		MaxMonthsHistory: 6,
 	},
 	user.PlanPro: {
 		MaxTransactions:  -1,
@@ -58,7 +64,9 @@ var Limits = map[user.Plan]PlanLimits{
 		HasDashboard:     true,
 		HasReports:       true,
 		HasExport:        true,
+		HasNotifications: true,
 		HasMultipleUsers: true,
+		MaxMonthsHistory: -1,
 	},
 }
 
