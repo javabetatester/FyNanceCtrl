@@ -3,27 +3,72 @@ package transaction
 import (
 	"context"
 	"errors"
+	"time"
 
 	"Fynance/internal/domain/account"
-	"Fynance/internal/domain/user"
+	"Fynance/internal/domain/category"
+	"Fynance/internal/domain/shared"
 	appErrors "Fynance/internal/errors"
+	"Fynance/internal/logger"
 	"Fynance/internal/pkg"
-	"strings"
-	"time"
 
 	"github.com/oklog/ulid/v2"
 	"gorm.io/gorm"
 )
 
+type BudgetUpdater interface {
+	UpdateSpent(ctx context.Context, categoryID, userID ulid.ULID, amount float64) error
+	UpdateSpentWithDate(ctx context.Context, categoryID, userID ulid.ULID, amount float64, transactionDate time.Time) error
+}
+
+type GoalContributionHandler interface {
+	DeleteContributionByTransactionId(ctx context.Context, transactionID, userID ulid.ULID) error
+}
+
+type InvestmentTransactionHandler interface {
+	DeleteInvestmentTransactionByTransactionId(ctx context.Context, transactionID, userID ulid.ULID) error
+}
+
 type Service struct {
-	Repository         Repository
-	CategoryRepository CategoryRepository
-	UserService        *user.Service
-	AccountService     *account.Service
+	Repository        Repository
+	CategoryService   *category.Service
+	AccountService    *account.Service
+	BudgetService     BudgetUpdater
+	GoalService       GoalContributionHandler
+	InvestmentService InvestmentTransactionHandler
+	shared.BaseService
+}
+
+func NewService(
+	repo Repository,
+	categoryService *category.Service,
+	accountService *account.Service,
+	userChecker *shared.UserCheckerService,
+) *Service {
+	return &Service{
+		Repository:      repo,
+		CategoryService: categoryService,
+		AccountService:  accountService,
+		BaseService: shared.BaseService{
+			UserChecker: userChecker,
+		},
+	}
+}
+
+func (s *Service) SetBudgetService(budgetService BudgetUpdater) {
+	s.BudgetService = budgetService
+}
+
+func (s *Service) SetGoalService(goalService GoalContributionHandler) {
+	s.GoalService = goalService
+}
+
+func (s *Service) SetInvestmentService(investmentService InvestmentTransactionHandler) {
+	s.InvestmentService = investmentService
 }
 
 func (s *Service) CreateTransaction(ctx context.Context, transaction *Transaction) error {
-	if err := s.ensureUserExists(ctx, transaction.UserId); err != nil {
+	if err := s.EnsureUserExists(ctx, transaction.UserId); err != nil {
 		return err
 	}
 
@@ -32,16 +77,27 @@ func (s *Service) CreateTransaction(ctx context.Context, transaction *Transactio
 		return err
 	}
 
-	err = s.CategoryValidation(ctx, transaction.CategoryId, transaction.UserId)
-	if err != nil {
+	if err := s.validateCreditCardRestrictions(accountEntity, transaction); err != nil {
 		return err
 	}
 
-	if err := s.validateTransactionBalance(ctx, transaction, accountEntity); err != nil {
+	if err := s.validateAndResolveCategory(ctx, transaction); err != nil {
 		return err
 	}
 
-	TransactionCreateStruct(transaction)
+	if accountEntity.Type == account.TypeCreditCard {
+		s.initTransaction(transaction)
+		if err := s.Repository.Create(ctx, transaction); err != nil {
+			return appErrors.NewDatabaseError(err)
+		}
+		return nil
+	}
+
+	if err := s.validateBalance(transaction, accountEntity); err != nil {
+		return err
+	}
+
+	s.initTransaction(transaction)
 	if err := s.Repository.Create(ctx, transaction); err != nil {
 		return appErrors.NewDatabaseError(err)
 	}
@@ -50,11 +106,13 @@ func (s *Service) CreateTransaction(ctx context.Context, transaction *Transactio
 		return err
 	}
 
+	s.updateBudgetIfExpense(ctx, transaction)
+
 	return nil
 }
 
 func (s *Service) UpdateTransaction(ctx context.Context, transaction *Transaction) error {
-	if err := s.ensureUserExists(ctx, transaction.UserId); err != nil {
+	if err := s.EnsureUserExists(ctx, transaction.UserId); err != nil {
 		return err
 	}
 
@@ -68,6 +126,10 @@ func (s *Service) UpdateTransaction(ctx context.Context, transaction *Transactio
 		return err
 	}
 
+	if err := s.validateCreditCardRestrictions(accountEntity, transaction); err != nil {
+		return err
+	}
+
 	oldAccountEntity, err := s.AccountService.GetAccountByID(ctx, storedTransaction.AccountId, transaction.UserId)
 	if err != nil {
 		return err
@@ -75,45 +137,24 @@ func (s *Service) UpdateTransaction(ctx context.Context, transaction *Transactio
 
 	transaction.UpdatedAt = time.Now()
 
-	err = s.UpdateTransactionValidation(ctx, transaction)
-	if err != nil {
+	if err := s.validateUpdate(ctx, transaction); err != nil {
 		return err
 	}
 
-	if err := s.validateTransactionBalance(ctx, transaction, accountEntity); err != nil {
+	if err := s.validateBalance(transaction, accountEntity); err != nil {
 		return err
 	}
 
-	if storedTransaction.AccountId != transaction.AccountId {
-		if err := s.revertAccountBalance(ctx, storedTransaction, oldAccountEntity); err != nil {
-			return err
-		}
-	} else {
-		amountDiff := transaction.Amount - storedTransaction.Amount
-		if storedTransaction.Type == Expense {
-			amountDiff = -amountDiff
-		}
-
-		if accountEntity.Type != account.TypeCreditCard {
-			if accountEntity.Balance+amountDiff < 0 {
-				return appErrors.NewValidationError("amount", "saldo insuficiente")
-			}
-		}
-
-		if err := s.AccountService.UpdateBalance(ctx, transaction.AccountId, transaction.UserId, amountDiff); err != nil {
-			return err
-		}
+	if err := s.processBalanceUpdate(ctx, storedTransaction, transaction, oldAccountEntity, accountEntity); err != nil {
+		return err
 	}
 
-	storedTransaction.AccountId = transaction.AccountId
-	storedTransaction.CategoryId = transaction.CategoryId
-	storedTransaction.Amount = transaction.Amount
-	storedTransaction.Description = transaction.Description
-	storedTransaction.Type = transaction.Type
-	if !transaction.Date.IsZero() {
-		storedTransaction.Date = transaction.Date
-	}
-	storedTransaction.UpdatedAt = transaction.UpdatedAt
+	oldCategoryId := storedTransaction.CategoryId
+	oldDate := storedTransaction.Date
+	oldType := storedTransaction.Type
+	oldAmount := storedTransaction.Amount
+
+	s.applyTransactionUpdate(storedTransaction, transaction)
 
 	if err := s.Repository.Update(ctx, storedTransaction); err != nil {
 		return err
@@ -125,6 +166,8 @@ func (s *Service) UpdateTransaction(ctx context.Context, transaction *Transactio
 		}
 	}
 
+	s.updateBudgetOnChange(ctx, transaction.UserId, oldCategoryId, oldDate, oldType, oldAmount, transaction)
+
 	return nil
 }
 
@@ -133,14 +176,27 @@ func (s *Service) DeleteTransaction(ctx context.Context, transactionID ulid.ULID
 	if err != nil {
 		return err
 	}
-
 	accountEntity, err := s.AccountService.GetAccountByID(ctx, transactionEntity.AccountId, userID)
 	if err != nil {
-		return err
+		appErr, isAppErr := appErrors.AsAppError(err)
+		if !isAppErr || appErr.Code != "NOT_FOUND" {
+			return err
+		}
+	} else {
+		if err := s.revertAccountBalance(ctx, transactionEntity, accountEntity); err != nil {
+			return err
+		}
 	}
 
-	if err := s.revertAccountBalance(ctx, transactionEntity, accountEntity); err != nil {
-		return err
+	s.revertBudgetIfExpense(ctx, transactionEntity)
+
+	if transactionEntity.Type == Goals && s.GoalService != nil {
+		_ = s.GoalService.DeleteContributionByTransactionId(ctx, transactionID, userID)
+	}
+
+	if (transactionEntity.Type == Investment || transactionEntity.Type == Withdraw) &&
+		transactionEntity.InvestmentId != nil && s.InvestmentService != nil {
+		_ = s.InvestmentService.DeleteInvestmentTransactionByTransactionId(ctx, transactionID, userID)
 	}
 
 	return s.Repository.Delete(ctx, transactionID)
@@ -157,8 +213,8 @@ func (s *Service) GetTransactionByID(ctx context.Context, transactionID ulid.ULI
 	return transaction, nil
 }
 
-func (s *Service) GetAllTransactions(ctx context.Context, userID ulid.ULID, accountID *ulid.ULID, pagination *pkg.PaginationParams) ([]*Transaction, int64, error) {
-	return s.Repository.GetAll(ctx, userID, accountID, pagination)
+func (s *Service) GetAllTransactions(ctx context.Context, userID ulid.ULID, accountID *ulid.ULID, filters *TransactionFilters, pagination *pkg.PaginationParams) ([]*Transaction, int64, error) {
+	return s.Repository.GetAll(ctx, userID, accountID, filters, pagination)
 }
 
 func (s *Service) GetTransactionsByAmount(ctx context.Context, amount float64, pagination *pkg.PaginationParams) ([]*Transaction, int64, error) {
@@ -185,252 +241,266 @@ func (s *Service) GetTransactionsByCategory(ctx context.Context, categoryID ulid
 	return transactions, total, nil
 }
 
-func (s *Service) CreateCategory(ctx context.Context, category *Category) error {
-	if err := s.ensureUserExists(ctx, category.UserId); err != nil {
-		return err
-	}
-
-	category.Name = strings.TrimSpace(category.Name)
-	if category.Name == "" {
-		return appErrors.NewValidationError("name", "é obrigatório")
-	}
-
-	if err := s.CategoryExists(ctx, category.Name, category.UserId); err != nil {
-		return err
-	}
-
-	CategoryCreateStruct(category)
-
-	if err := s.CategoryRepository.Create(ctx, category); err != nil {
-		return appErrors.NewDatabaseError(err)
-	}
-
-	return nil
-}
-
-func (s *Service) UpdateCategory(ctx context.Context, category *Category) error {
-	if err := s.ensureUserExists(ctx, category.UserId); err != nil {
-		return err
-	}
-
-	existingCategory, err := s.CategoryRepository.GetByID(ctx, category.Id, category.UserId)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return appErrors.ErrCategoryNotFound
-	}
-	if err != nil {
-		return appErrors.NewDatabaseError(err)
-	}
-
-	category.Name = strings.TrimSpace(category.Name)
-	if category.Name == "" {
-		return appErrors.NewValidationError("name", "é obrigatório")
-	}
-
-	if !strings.EqualFold(existingCategory.Name, category.Name) {
-		if err := s.CategoryExists(ctx, category.Name, category.UserId); err != nil {
-			return err
-		}
-	}
-
-	existingCategory.Name = category.Name
-	existingCategory.Icon = category.Icon
-	existingCategory.UpdatedAt = time.Now()
-
-	return s.CategoryRepository.Update(ctx, existingCategory)
-}
-
-func (s *Service) DeleteCategory(ctx context.Context, categoryID ulid.ULID, userID ulid.ULID) error {
-	if err := s.ensureUserExists(ctx, userID); err != nil {
-		return err
-	}
-
-	if _, err := s.CategoryRepository.GetByID(ctx, categoryID, userID); errors.Is(err, gorm.ErrRecordNotFound) {
-		return appErrors.ErrCategoryNotFound
-	} else if err != nil {
-		return appErrors.NewDatabaseError(err)
-	}
-	return s.CategoryRepository.Delete(ctx, categoryID, userID)
-}
-
-func (s *Service) GetCategoryByID(ctx context.Context, categoryID ulid.ULID, userID ulid.ULID) (*Category, error) {
-	if err := s.ensureUserExists(ctx, userID); err != nil {
-		return nil, err
-	}
-
-	category, err := s.CategoryRepository.GetByID(ctx, categoryID, userID)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		if s.isDefaultCategory(categoryID, userID) {
-			defaultCategories := GetDefaultCategoriesAsDomain(userID)
-			for _, defaultCat := range defaultCategories {
-				if defaultCat.Id == categoryID {
-					return defaultCat, nil
-				}
-			}
-		}
-		return nil, appErrors.ErrCategoryNotFound
-	}
-	if err != nil {
-		return nil, appErrors.NewDatabaseError(err)
-	}
-
-	return category, nil
-}
-
-func (s *Service) GetAllCategories(ctx context.Context, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*Category, int64, error) {
-	if err := s.ensureUserExists(ctx, userID); err != nil {
-		return nil, 0, err
-	}
-	
-	customCategories, _, err := s.CategoryRepository.GetAll(ctx, userID, nil)
-	if err != nil {
-		return nil, 0, appErrors.NewDatabaseError(err)
-	}
-	
-	defaultCategories := GetDefaultCategoriesAsDomain(userID)
-	
-	customMap := make(map[string]*Category)
-	for _, cat := range customCategories {
-		customMap[cat.Name] = cat
-	}
-	
-	allCategories := make([]*Category, 0, len(defaultCategories)+len(customCategories))
-	for _, defaultCat := range defaultCategories {
-		if customCat, exists := customMap[defaultCat.Name]; exists {
-			allCategories = append(allCategories, customCat)
-		} else {
-			allCategories = append(allCategories, defaultCat)
-		}
-	}
-	
-	for _, customCat := range customCategories {
-		isDefault := false
-		for _, defaultCat := range DefaultCategories {
-			if customCat.Name == defaultCat.Name {
-				isDefault = true
-				break
-			}
-		}
-		if !isDefault {
-			allCategories = append(allCategories, customCat)
-		}
-	}
-	
-	total := int64(len(allCategories))
-	
-	if pagination != nil {
-		pagination.Normalize()
-		start := pagination.Offset()
-		end := start + pagination.Limit
-		
-		if start >= len(allCategories) {
-			return []*Category{}, total, nil
-		}
-		if end > len(allCategories) {
-			end = len(allCategories)
-		}
-		
-		allCategories = allCategories[start:end]
-	}
-	
-	return allCategories, total, nil
-}
-
-func (s *Service) CategoryExists(ctx context.Context, categoryName string, userID ulid.ULID) error {
-	trimmedName := strings.TrimSpace(categoryName)
-	if trimmedName == "" {
-		return appErrors.NewValidationError("name", "é obrigatório")
-	}
-
-	_, err := s.CategoryRepository.GetByName(ctx, trimmedName, userID)
-
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil
-	}
-
-	if err != nil {
-		return appErrors.NewDatabaseError(err)
-	}
-
-	return appErrors.NewConflictError("categoria")
-}
-
-func (s *Service) CategoryValidation(ctx context.Context, categoryId ulid.ULID, userID ulid.ULID) error {
-	category, err := s.CategoryRepository.GetByID(ctx, categoryId, userID)
-	
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		if s.isDefaultCategory(categoryId, userID) {
-			if err := s.createDefaultCategoryIfNeeded(ctx, categoryId, userID); err != nil {
-				return appErrors.ErrCategoryNotFound
-			}
-			return nil
-		}
-		return appErrors.ErrCategoryNotFound
-	}
-
-	if err != nil {
-		return appErrors.NewDatabaseError(err)
-	}
-
-	if category != nil {
-		return nil
-	}
-
-	return appErrors.ErrCategoryNotFound
-}
-
-func (s *Service) isDefaultCategory(categoryID ulid.ULID, userID ulid.ULID) bool {
-	defaultCategories := GetDefaultCategoriesAsDomain(userID)
-	for _, defaultCat := range defaultCategories {
-		if defaultCat.Id == categoryID {
-			return true
-		}
-	}
-	return false
-}
-
-func (s *Service) createDefaultCategoryIfNeeded(ctx context.Context, categoryID ulid.ULID, userID ulid.ULID) error {
-	defaultCategories := GetDefaultCategoriesAsDomain(userID)
-	for _, defaultCat := range defaultCategories {
-		if defaultCat.Id == categoryID {
-			existing, err := s.CategoryRepository.GetByName(ctx, defaultCat.Name, userID)
-			if err == nil && existing != nil {
-				return nil
-			}
-			
-			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-				if isUniqueConstraintError(err) {
-					return nil
-				}
-				return err
-			}
-			
-			category := &Category{
-				Id:        defaultCat.Id,
-				UserId:    userID,
-				Name:      defaultCat.Name,
-				Icon:      defaultCat.Icon,
-				CreatedAt: defaultCat.CreatedAt,
-				UpdatedAt: defaultCat.UpdatedAt,
-			}
-			
-			if err := s.CategoryRepository.Create(ctx, category); err != nil {
-				if isUniqueConstraintError(err) {
-					return nil
-				}
-				return err
-			}
-			return nil
-		}
-	}
-	return appErrors.ErrCategoryNotFound
-}
-
 func (s *Service) GetNumberOfTransactions(ctx context.Context, userID ulid.ULID) (int64, error) {
 	count, err := s.Repository.GetNumberOfTransactions(ctx, userID)
 	if err != nil {
 		return 0, appErrors.NewDatabaseError(err)
 	}
 	return count, nil
+}
+
+func (s *Service) CategoryValidation(ctx context.Context, categoryId ulid.ULID, userID ulid.ULID) error {
+	if s.CategoryService == nil {
+		return appErrors.ErrInternalServer
+	}
+	return s.CategoryService.ValidateAndEnsureExists(ctx, categoryId, userID)
+}
+
+func (s *Service) CreateDefaultCategories(ctx context.Context, userID ulid.ULID) error {
+	if s.CategoryService == nil {
+		return appErrors.ErrInternalServer
+	}
+	return s.CategoryService.CreateDefaultCategories(ctx, userID)
+}
+
+func (s *Service) CreateCategory(ctx context.Context, cat *category.Category) error {
+	if s.CategoryService == nil {
+		return appErrors.ErrInternalServer
+	}
+	return s.CategoryService.Create(ctx, cat)
+}
+
+func (s *Service) UpdateCategory(ctx context.Context, cat *category.Category) error {
+	if s.CategoryService == nil {
+		return appErrors.ErrInternalServer
+	}
+	return s.CategoryService.Update(ctx, cat)
+}
+
+func (s *Service) DeleteCategory(ctx context.Context, categoryID ulid.ULID, userID ulid.ULID) error {
+	if s.CategoryService == nil {
+		return appErrors.ErrInternalServer
+	}
+	return s.CategoryService.Delete(ctx, categoryID, userID)
+}
+
+func (s *Service) GetCategoryByID(ctx context.Context, categoryID ulid.ULID, userID ulid.ULID) (*category.Category, error) {
+	if s.CategoryService == nil {
+		return nil, appErrors.ErrInternalServer
+	}
+	return s.CategoryService.GetByID(ctx, categoryID, userID)
+}
+
+func (s *Service) GetAllCategories(ctx context.Context, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*category.Category, int64, error) {
+	if s.CategoryService == nil {
+		return nil, 0, appErrors.ErrInternalServer
+	}
+	return s.CategoryService.GetAll(ctx, userID, pagination)
+}
+
+func (s *Service) validateCreditCardRestrictions(accountEntity *account.Account, transaction *Transaction) error {
+	if accountEntity.Type == account.TypeCreditCard && transaction.Type != Expense {
+		return appErrors.NewValidationError("type", "cartao de credito so permite despesas")
+	}
+	return nil
+}
+
+func (s *Service) validateAndResolveCategory(ctx context.Context, transaction *Transaction) error {
+	if transaction.Type == Investment || transaction.Type == Withdraw {
+		return nil
+	}
+
+	if transaction.CategoryId == nil {
+		return appErrors.NewValidationError("category_id", "é obrigatório")
+	}
+
+	if s.CategoryService == nil {
+		return nil
+	}
+
+	return s.CategoryService.ValidateAndEnsureExists(ctx, *transaction.CategoryId, transaction.UserId)
+}
+
+func (s *Service) validateBalance(transaction *Transaction, accountEntity *account.Account) error {
+	if transaction.Type != Expense {
+		return nil
+	}
+
+	if accountEntity.Type == account.TypeCreditCard {
+		return nil
+	}
+
+	amount := transaction.Amount
+	if amount < 0 {
+		amount = -amount
+	}
+
+	if accountEntity.Balance < amount {
+		return appErrors.NewValidationError("valor", "saldo insuficiente")
+	}
+
+	return nil
+}
+
+func (s *Service) validateUpdate(ctx context.Context, transaction *Transaction) error {
+	if transaction.Amount == 0 {
+		return appErrors.NewValidationError("valor", "deve ser diferente de zero")
+	}
+
+	if transaction.Type != Investment && transaction.Type != Withdraw {
+		if transaction.CategoryId == nil {
+			return appErrors.NewValidationError("category_id", "é obrigatório")
+		}
+
+		if s.CategoryService != nil {
+			if _, err := s.CategoryService.GetByID(ctx, *transaction.CategoryId, transaction.UserId); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (s *Service) processBalanceUpdate(ctx context.Context, stored, updated *Transaction, oldAccount, newAccount *account.Account) error {
+	if stored.AccountId != updated.AccountId {
+		return s.revertAccountBalance(ctx, stored, oldAccount)
+	}
+
+	amountDiff := updated.Amount - stored.Amount
+	if stored.Type == Expense {
+		amountDiff = -amountDiff
+	}
+
+	if newAccount.Type != account.TypeCreditCard {
+		if newAccount.Balance+amountDiff < 0 {
+			return appErrors.NewValidationError("valor", "saldo insuficiente")
+		}
+	}
+
+	return s.AccountService.UpdateBalance(ctx, updated.AccountId, updated.UserId, amountDiff)
+}
+
+func (s *Service) applyTransactionUpdate(stored, updated *Transaction) {
+	stored.AccountId = updated.AccountId
+	stored.CategoryId = updated.CategoryId
+	stored.Amount = updated.Amount
+	stored.Description = updated.Description
+	stored.Type = updated.Type
+	if !updated.Date.IsZero() {
+		stored.Date = updated.Date
+	}
+	stored.UpdatedAt = updated.UpdatedAt
+}
+
+func (s *Service) updateAccountBalance(ctx context.Context, transaction *Transaction, accountEntity *account.Account) error {
+	if accountEntity.Type == account.TypeCreditCard {
+		return nil
+	}
+
+	var amount float64
+	switch transaction.Type {
+	case Receipt:
+		amount = transaction.Amount
+	case Expense:
+		if transaction.Amount < 0 {
+			amount = transaction.Amount
+		} else {
+			amount = -transaction.Amount
+		}
+	default:
+		return nil
+	}
+
+	return s.AccountService.UpdateBalance(ctx, transaction.AccountId, transaction.UserId, amount)
+}
+
+func (s *Service) revertAccountBalance(ctx context.Context, transaction *Transaction, accountEntity *account.Account) error {
+	if accountEntity.Type == account.TypeCreditCard {
+		return nil
+	}
+
+	var amount float64
+	switch transaction.Type {
+	case Receipt:
+		amount = -transaction.Amount
+	case Expense:
+		if transaction.Amount < 0 {
+			amount = -transaction.Amount
+		} else {
+			amount = transaction.Amount
+		}
+	default:
+		return nil
+	}
+
+	return s.AccountService.UpdateBalance(ctx, transaction.AccountId, transaction.UserId, amount)
+}
+
+func (s *Service) updateBudgetIfExpense(ctx context.Context, transaction *Transaction) {
+	if transaction.Type != Expense || s.BudgetService == nil || transaction.CategoryId == nil {
+		return
+	}
+
+	spentAmount := transaction.Amount
+	if spentAmount < 0 {
+		spentAmount = -spentAmount
+	}
+
+	if err := s.BudgetService.UpdateSpentWithDate(ctx, *transaction.CategoryId, transaction.UserId, spentAmount, transaction.Date); err != nil {
+		logger.Error().
+			Err(err).
+			Str("category_id", transaction.CategoryId.String()).
+			Str("user_id", transaction.UserId.String()).
+			Float64("amount", spentAmount).
+			Msg("error updating budget spent")
+	}
+}
+
+func (s *Service) revertBudgetIfExpense(ctx context.Context, transaction *Transaction) {
+	if transaction.Type != Expense || s.BudgetService == nil || transaction.CategoryId == nil {
+		return
+	}
+
+	spentAmount := transaction.Amount
+	if spentAmount < 0 {
+		spentAmount = -spentAmount
+	}
+
+	_ = s.BudgetService.UpdateSpentWithDate(ctx, *transaction.CategoryId, transaction.UserId, -spentAmount, transaction.Date)
+}
+
+func (s *Service) updateBudgetOnChange(ctx context.Context, userID ulid.ULID, oldCategoryId *ulid.ULID, oldDate time.Time, oldType Types, oldAmount float64, newTx *Transaction) {
+	if s.BudgetService == nil {
+		return
+	}
+
+	if oldType == Expense && oldCategoryId != nil {
+		oldSpentAmount := oldAmount
+		if oldSpentAmount < 0 {
+			oldSpentAmount = -oldSpentAmount
+		}
+		_ = s.BudgetService.UpdateSpentWithDate(ctx, *oldCategoryId, userID, -oldSpentAmount, oldDate)
+	}
+
+	if newTx.Type == Expense && newTx.CategoryId != nil {
+		newSpentAmount := newTx.Amount
+		if newSpentAmount < 0 {
+			newSpentAmount = -newSpentAmount
+		}
+		transactionDate := newTx.Date
+		if transactionDate.IsZero() {
+			transactionDate = time.Now()
+		}
+		_ = s.BudgetService.UpdateSpentWithDate(ctx, *newTx.CategoryId, userID, newSpentAmount, transactionDate)
+	}
+}
+
+func (s *Service) initTransaction(transaction *Transaction) {
+	transaction.Id = pkg.GenerateULIDObject()
+	now := pkg.SetTimestamps()
+	transaction.CreatedAt = now
+	transaction.UpdatedAt = now
 }
 
 func TransactionCreateStruct(transaction *Transaction) {
@@ -440,126 +510,6 @@ func TransactionCreateStruct(transaction *Transaction) {
 	transaction.UpdatedAt = now
 }
 
-func CategoryCreateStruct(category *Category) {
-	category.Id = pkg.GenerateULIDObject()
-	category.CreatedAt = time.Now()
-	category.UpdatedAt = time.Now()
-}
-
-func (s *Service) UpdateTransactionValidation(ctx context.Context, transaction *Transaction) error {
-	if transaction.Amount < 0 {
-		return appErrors.NewValidationError("amount", "deve ser maior que zero")
-	}
-
-	if _, err := s.GetCategoryByID(ctx, transaction.CategoryId, transaction.UserId); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (s *Service) TransactionExists(ctx context.Context, transactionID ulid.ULID, userID ulid.ULID) error {
-	_, err := s.GetTransactionByID(ctx, transactionID, userID)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return appErrors.ErrTransactionNotFound
-	}
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *Service) CreateDefaultCategories(ctx context.Context, userID ulid.ULID) error {
-	if err := s.ensureUserExists(ctx, userID); err != nil {
-		return err
-	}
-
-	for _, defaultCat := range DefaultCategories {
-		categoryName := strings.TrimSpace(defaultCat.Name)
-		if categoryName == "" {
-			continue
-		}
-
-		existing, err := s.CategoryRepository.GetByName(ctx, categoryName, userID)
-		if err == nil && existing != nil {
-			continue
-		}
-
-		category := &Category{
-			UserId: userID,
-			Name:   categoryName,
-			Icon:   defaultCat.Icon,
-		}
-
-		CategoryCreateStruct(category)
-		if err := s.CategoryRepository.Create(ctx, category); err != nil {
-			if isUniqueConstraintError(err) {
-				continue
-			}
-		}
-	}
-
-	return nil
-}
-
-func isUniqueConstraintError(err error) bool {
-	if err == nil {
-		return false
-	}
-	errStr := strings.ToLower(err.Error())
-	return strings.Contains(errStr, "23505") ||
-		strings.Contains(errStr, "duplicate") ||
-		strings.Contains(errStr, "unique constraint") ||
-		strings.Contains(errStr, "violates unique constraint") ||
-		strings.Contains(errStr, "idx_categories_user_name")
-}
-
-func (s *Service) ensureUserExists(ctx context.Context, userID ulid.ULID) error {
-	if s.UserService == nil {
-		return appErrors.ErrInternalServer.WithError(errors.New("user service not configured"))
-	}
-	_, err := s.UserService.GetByID(ctx, userID)
-	if err != nil {
-		return appErrors.ErrUserNotFound
-	}
-	return nil
-}
-
-func (s *Service) validateTransactionBalance(_ context.Context, transaction *Transaction, accountEntity *account.Account) error {
-	if transaction.Type == Expense {
-		if accountEntity.Type != account.TypeCreditCard {
-			if accountEntity.Balance < transaction.Amount {
-				return appErrors.NewValidationError("amount", "saldo insuficiente")
-			}
-		}
-	}
-	return nil
-}
-
-func (s *Service) updateAccountBalance(ctx context.Context, transaction *Transaction, _ *account.Account) error {
-	var amount float64
-	switch transaction.Type {
-	case Receipt:
-		amount = transaction.Amount
-	case Expense:
-		amount = -transaction.Amount
-	default:
-		return nil
-	}
-
-	return s.AccountService.UpdateBalance(ctx, transaction.AccountId, transaction.UserId, amount)
-}
-
-func (s *Service) revertAccountBalance(ctx context.Context, transaction *Transaction, _ *account.Account) error {
-	var amount float64
-	switch transaction.Type {
-	case Receipt:
-		amount = -transaction.Amount
-	case Expense:
-		amount = transaction.Amount
-	default:
-		return nil
-	}
-
-	return s.AccountService.UpdateBalance(ctx, transaction.AccountId, transaction.UserId, amount)
+func NormalizeCategoryName(name string) string {
+	return shared.NormalizeName(name)
 }
