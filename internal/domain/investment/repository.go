@@ -8,9 +8,13 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+type InvestmentFilters struct {
+	Type *string
+}
+
 type Repository interface {
 	Create(ctx context.Context, investment *Investment) error
-	List(ctx context.Context, userId ulid.ULID, pagination *pkg.PaginationParams) ([]*Investment, int64, error)
+	List(ctx context.Context, userId ulid.ULID, filters *InvestmentFilters, pagination *pkg.PaginationParams) ([]*Investment, int64, error)
 	Update(ctx context.Context, investment *Investment) error
 	Delete(ctx context.Context, id ulid.ULID, userId ulid.ULID) error
 	GetInvestmentById(ctx context.Context, id ulid.ULID, userId ulid.ULID) (*Investment, error)
