@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"Fynance/internal/contracts"
 	"Fynance/internal/domain/account"
 	"Fynance/internal/domain/category"
-	domaincontracts "Fynance/internal/domain/contracts"
 	"Fynance/internal/domain/shared"
 	"Fynance/internal/domain/transaction"
 	appErrors "Fynance/internal/errors"
@@ -18,19 +18,16 @@ import (
 	"gorm.io/gorm"
 )
 
-type TransactionHandler interface {
-	CreateTransaction(ctx context.Context, transaction *transaction.Transaction) error
-	DeleteTransaction(ctx context.Context, transactionID ulid.ULID, userID ulid.ULID) error
-}
-
 type Service struct {
 	Repository         Repository
-	AccountService     *account.Service
-	TransactionService TransactionHandler
+	AccountService     account.AccountServiceInterface
+	TransactionService transaction.TransactionHandler
 	shared.BaseService
 }
 
-func NewService(repo Repository, accountService *account.Service, transactionService TransactionHandler, userChecker *shared.UserCheckerService) *Service {
+var _ shared.GoalContributionDeleter = (*Service)(nil)
+
+func NewService(repo Repository, accountService account.AccountServiceInterface, transactionService transaction.TransactionHandler, userChecker *shared.UserCheckerService) *Service {
 	return &Service{
 		Repository:         repo,
 		AccountService:     accountService,
@@ -41,7 +38,7 @@ func NewService(repo Repository, accountService *account.Service, transactionSer
 	}
 }
 
-func (s *Service) CreateGoal(ctx context.Context, request *domaincontracts.GoalCreateRequest) error {
+func (s *Service) CreateGoal(ctx context.Context, request *contracts.GoalCreateRequestDomain) error {
 	if err := s.validateGoalCreate(request); err != nil {
 		return err
 	}
@@ -317,7 +314,7 @@ func (s *Service) GetGoalProgress(ctx context.Context, goalID, userID ulid.ULID)
 	}, nil
 }
 
-func (s *Service) UpdateGoal(ctx context.Context, request *domaincontracts.GoalUpdateRequest) error {
+func (s *Service) UpdateGoal(ctx context.Context, request *contracts.GoalUpdateRequestDomain) error {
 	if err := s.validateGoalUpdate(request); err != nil {
 		return err
 	}
@@ -385,7 +382,7 @@ func (s *Service) CheckGoalBelongsToUser(ctx context.Context, goalID ulid.ULID, 
 	return nil
 }
 
-func (s *Service) validateGoalCreate(request *domaincontracts.GoalCreateRequest) error {
+func (s *Service) validateGoalCreate(request *contracts.GoalCreateRequestDomain) error {
 	if request.Name == "" {
 		return appErrors.NewValidationError("name", "é obrigatório")
 	}
@@ -398,7 +395,7 @@ func (s *Service) validateGoalCreate(request *domaincontracts.GoalCreateRequest)
 	return nil
 }
 
-func (s *Service) validateGoalUpdate(request *domaincontracts.GoalUpdateRequest) error {
+func (s *Service) validateGoalUpdate(request *contracts.GoalUpdateRequestDomain) error {
 	if request.Name == "" {
 		return appErrors.NewValidationError("name", "e obrigatorio")
 	}
@@ -417,7 +414,6 @@ func (s *Service) createGoalTransaction(ctx context.Context, goal *Goal, account
 		desc = "Contribuição para meta: " + goal.Name
 	}
 
-	// Busca categoria de metas
 	defaultCategories := category.GetDefaultCategoriesForUser(userID)
 	var categoryID ulid.ULID
 	for _, cat := range defaultCategories {

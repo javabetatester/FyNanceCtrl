@@ -1,12 +1,16 @@
 package infrastructure
 
 import (
+	"Fynance/internal/middleware"
+
 	"gorm.io/gorm"
 )
 
 type ResourceCounter struct {
 	DB *gorm.DB
 }
+
+var _ middleware.ResourceCounter = (*ResourceCounter)(nil)
 
 func (r *ResourceCounter) CountTransactions(userID string) (int64, error) {
 	var count int64

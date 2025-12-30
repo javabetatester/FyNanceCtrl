@@ -2,6 +2,7 @@ package shared
 
 import (
 	"context"
+	"time"
 
 	"github.com/oklog/ulid/v2"
 )
@@ -30,15 +31,20 @@ type AccountService interface {
 
 type BudgetUpdater interface {
 	UpdateSpent(ctx context.Context, categoryID, userID ulid.ULID, amount float64) error
-	UpdateSpentWithDate(ctx context.Context, categoryID, userID ulid.ULID, amount float64, transactionDate interface{}) error
+	UpdateSpentWithDate(ctx context.Context, categoryID, userID ulid.ULID, amount float64, transactionDate time.Time) error
 }
-	
+
 type TransactionCreator interface {
 	CreateTransaction(ctx context.Context, transaction interface{}) error
 }
 
 type TransactionDeleter interface {
 	DeleteTransaction(ctx context.Context, transactionID, userID ulid.ULID) error
+}
+
+type TransactionHandler interface {
+	TransactionCreator
+	TransactionDeleter
 }
 
 type GoalContributionDeleter interface {

@@ -1,7 +1,5 @@
 package contracts
 
-import "Fynance/internal/domain/investment"
-
 type InvestmentCreateRequest struct {
 	AccountID     string  `json:"account_id" binding:"required"`
 	Type          string  `json:"type" binding:"required,oneof=CDB LCI LCA TESOURO_DIRETO ACOES FUNDOS CRIPTOMOEDAS PREVIDENCIA"`
@@ -34,18 +32,4 @@ type InvestmentWithdrawRequest struct {
 type InvestmentReturnResponse struct {
 	Profit           float64 `json:"profit"`
 	ReturnPercentage float64 `json:"returnPercentage"`
-}
-
-type InvestmentCreateResponse struct {
-	Message    string                `json:"message"`
-	Investment investment.Investment `json:"investment"`
-}
-
-type InvestmentListResponse struct {
-	Investments []*investment.Investment `json:"investments"`
-	Total       int                      `json:"total"`
-}
-
-type InvestmentSingleResponse struct {
-	Investment *investment.Investment `json:"investment"`
 }

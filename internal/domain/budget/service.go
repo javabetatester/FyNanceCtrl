@@ -21,6 +21,8 @@ type Service struct {
 	shared.BaseService
 }
 
+var _ shared.BudgetUpdater = (*Service)(nil)
+
 func NewService(repo Repository, categoryService *category.Service, userChecker *shared.UserCheckerService) *Service {
 	return &Service{
 		Repository:      repo,

@@ -15,6 +15,8 @@ type InvestmentRepository struct {
 	DB *gorm.DB
 }
 
+var _ investment.Repository = (*InvestmentRepository)(nil)
+
 type investmentDB struct {
 	Id              string    `gorm:"type:varchar(26);primaryKey"`
 	UserId          string    `gorm:"type:varchar(26);index;not null"`

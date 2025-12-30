@@ -15,6 +15,8 @@ type RecurringRepository struct {
 	DB *gorm.DB
 }
 
+var _ recurring.Repository = (*RecurringRepository)(nil)
+
 type recurringDB struct {
 	Id            string     `gorm:"type:varchar(26);primaryKey;column:id"`
 	UserId        string     `gorm:"type:varchar(26);index;not null;column:user_id"`

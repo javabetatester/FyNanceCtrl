@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"Fynance/internal/contracts"
 	"Fynance/internal/domain/account"
-	domaincontracts "Fynance/internal/domain/contracts"
 	"Fynance/internal/domain/shared"
 	"Fynance/internal/domain/transaction"
 	appErrors "Fynance/internal/errors"
@@ -15,19 +15,16 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-type AccountServiceInterface interface {
-	GetAccountByID(ctx context.Context, accountID, userID ulid.ULID) (*account.Account, error)
-	UpdateBalance(ctx context.Context, accountID, userID ulid.ULID, amount float64) error
-}
-
 type Service struct {
 	Repository      Repository
 	TransactionRepo transaction.Repository
-	AccountService  AccountServiceInterface
+	AccountService  account.AccountServiceInterface
 	shared.BaseService
 }
 
-func NewService(repo Repository, transactionRepo transaction.Repository, accountService AccountServiceInterface, userChecker *shared.UserCheckerService) *Service {
+var _ shared.InvestmentTransactionDeleter = (*Service)(nil)
+
+func NewService(repo Repository, transactionRepo transaction.Repository, accountService account.AccountServiceInterface, userChecker *shared.UserCheckerService) *Service {
 	return &Service{
 		Repository:      repo,
 		TransactionRepo: transactionRepo,
@@ -38,7 +35,7 @@ func NewService(repo Repository, transactionRepo transaction.Repository, account
 	}
 }
 
-func (s *Service) CreateInvestment(ctx context.Context, req domaincontracts.CreateInvestmentRequest) (*Investment, error) {
+func (s *Service) CreateInvestment(ctx context.Context, req contracts.CreateInvestmentRequestDomain) (*Investment, error) {
 	if err := s.EnsureUserExists(ctx, req.UserId); err != nil {
 		return nil, err
 	}
@@ -300,7 +297,7 @@ func (s *Service) DeleteInvestmentTransactionByTransactionId(ctx context.Context
 	return s.Repository.Update(ctx, investment)
 }
 
-func (s *Service) UpdateInvestment(ctx context.Context, investmentID, userID ulid.ULID, req domaincontracts.UpdateInvestmentRequest) error {
+func (s *Service) UpdateInvestment(ctx context.Context, investmentID, userID ulid.ULID, req contracts.UpdateInvestmentRequestDomain) error {
 	investment, err := s.Repository.GetInvestmentByID(ctx, investmentID, userID)
 	if err != nil {
 		return err
@@ -338,7 +335,7 @@ func (s *Service) UpdateInvestment(ctx context.Context, investmentID, userID uli
 	investment.UpdatedAt = time.Now()
 	return s.Repository.Update(ctx, investment)
 }
-func (s *Service) createInvestmentEntity(req domaincontracts.CreateInvestmentRequest, investmentID ulid.ULID) *Investment {
+func (s *Service) createInvestmentEntity(req contracts.CreateInvestmentRequestDomain, investmentID ulid.ULID) *Investment {
 	now := pkg.SetTimestamps()
 
 	return &Investment{
@@ -355,7 +352,7 @@ func (s *Service) createInvestmentEntity(req domaincontracts.CreateInvestmentReq
 	}
 }
 
-func (s *Service) createInitialTransaction(req domaincontracts.CreateInvestmentRequest, investmentID ulid.ULID) *transaction.Transaction {
+func (s *Service) createInitialTransaction(req contracts.CreateInvestmentRequestDomain, investmentID ulid.ULID) *transaction.Transaction {
 	now := pkg.SetTimestamps()
 
 	return &transaction.Transaction{

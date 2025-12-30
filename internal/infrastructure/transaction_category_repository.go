@@ -16,6 +16,8 @@ type TransactionCategoryRepository struct {
 	DB *gorm.DB
 }
 
+var _ transaction.CategoryRepository = (*TransactionCategoryRepository)(nil)
+
 type categoryDB struct {
 	UserId    string    `gorm:"type:varchar(26);index;not null"`
 	Id        string    `gorm:"type:varchar(26);primaryKey"`

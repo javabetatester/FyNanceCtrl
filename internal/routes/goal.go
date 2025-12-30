@@ -2,7 +2,6 @@ package routes
 
 import (
 	"Fynance/internal/contracts"
-	domaincontracts "Fynance/internal/domain/contracts"
 	"Fynance/internal/domain/goal"
 	appErrors "Fynance/internal/errors"
 	"Fynance/internal/pkg"
@@ -24,7 +23,7 @@ func (h *Handler) CreateGoal(c *gin.Context) {
 		return
 	}
 
-	req := domaincontracts.GoalCreateRequest{
+	req := contracts.GoalCreateRequestDomain{
 		UserId:  userID,
 		Name:    body.Name,
 		Target:  body.Target,
@@ -65,7 +64,7 @@ func (h *Handler) UpdateGoal(c *gin.Context) {
 		return
 	}
 
-	req := domaincontracts.GoalUpdateRequest{
+	req := contracts.GoalUpdateRequestDomain{
 		Id:      goalID,
 		UserId:  userID,
 		Name:    body.Name,
@@ -135,7 +134,7 @@ func (h *Handler) GetGoal(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, contracts.GoalResponse{Goal: goalEntity})
+	c.JSON(http.StatusOK, GoalResponse{Goal: goalEntity})
 }
 
 func (h *Handler) DeleteGoal(c *gin.Context) {
@@ -272,7 +271,7 @@ func (h *Handler) GetGoalContributions(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, contracts.GoalContributionListResponse{Contributions: contributions, Total: len(contributions)})
+	c.JSON(http.StatusOK, GoalContributionListResponse{Contributions: contributions, Total: len(contributions)})
 }
 
 func (h *Handler) GetGoalProgress(c *gin.Context) {
@@ -301,7 +300,7 @@ func (h *Handler) GetGoalProgress(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, contracts.GoalProgressResponse{Progress: progress})
+	c.JSON(http.StatusOK, GoalProgressResponse{Progress: progress})
 }
 
 func (h *Handler) DeleteContribution(c *gin.Context) {

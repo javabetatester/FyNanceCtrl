@@ -18,6 +18,8 @@ type Service struct {
 	shared.BaseService
 }
 
+var _ CategoryServiceInterface = (*Service)(nil)
+
 func NewService(repo Repository, userChecker *shared.UserCheckerService) *Service {
 	return &Service{
 		Repository: repo,

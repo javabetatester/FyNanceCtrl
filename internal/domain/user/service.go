@@ -4,6 +4,7 @@ import (
 	"context"
 	"regexp"
 
+	"Fynance/internal/domain/shared"
 	appErrors "Fynance/internal/errors"
 	"Fynance/internal/pkg"
 
@@ -14,6 +15,8 @@ import (
 type Service struct {
 	Repository Repository
 }
+
+var _ shared.UserChecker = (*Service)(nil)
 
 func NewService(repo Repository) *Service {
 	return &Service{Repository: repo}

@@ -17,6 +17,8 @@ type UserRepository struct {
 	DB *gorm.DB
 }
 
+var _ user.Repository = (*UserRepository)(nil)
+
 type userDB struct {
 	Id        string    `gorm:"type:varchar(26);primaryKey"`
 	Name      string    `gorm:"type:varchar(100);not null"`

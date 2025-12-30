@@ -31,7 +31,6 @@ func (Goal) TableName() string {
 	return "goals"
 }
 
-// GetProgress retorna a porcentagem de progresso da meta
 func (g *Goal) GetProgress() float64 {
 	if g.TargetAmount == 0 {
 		return 0
@@ -39,7 +38,6 @@ func (g *Goal) GetProgress() float64 {
 	return (g.CurrentAmount / g.TargetAmount) * 100
 }
 
-// GetCurrentMilestone retorna o milestone atual (25, 50, 75, 100)
 func (g *Goal) GetCurrentMilestone() int {
 	progress := g.GetProgress()
 	if progress >= 100 {
@@ -54,7 +52,6 @@ func (g *Goal) GetCurrentMilestone() int {
 	return 0
 }
 
-// HasNewMilestone verifica se há um novo milestone a ser alcançado
 func (g *Goal) HasNewMilestone() bool {
 	currentMilestone := g.GetCurrentMilestone()
 	return currentMilestone > g.LastMilestone

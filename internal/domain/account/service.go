@@ -17,6 +17,11 @@ type Service struct {
 	shared.BaseService
 }
 
+var (
+	_ shared.BalanceUpdater   = (*Service)(nil)
+	_ AccountServiceInterface = (*Service)(nil)
+)
+
 func NewService(repo Repository, userChecker *shared.UserCheckerService) *Service {
 	return &Service{
 		Repository: repo,

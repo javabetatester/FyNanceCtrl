@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"Fynance/internal/contracts"
-	domaincontracts "Fynance/internal/domain/contracts"
 	"Fynance/internal/domain/investment"
 	appErrors "Fynance/internal/errors"
 	"Fynance/internal/pkg"
@@ -32,7 +31,7 @@ func (h *Handler) CreateInvestment(c *gin.Context) {
 		return
 	}
 
-	req := domaincontracts.CreateInvestmentRequest{
+	req := contracts.CreateInvestmentRequestDomain{
 		UserId:        userID,
 		AccountId:     accountID,
 		CategoryId:    ulid.ULID{},
@@ -49,7 +48,7 @@ func (h *Handler) CreateInvestment(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, contracts.InvestmentCreateResponse{
+	c.JSON(http.StatusCreated, InvestmentCreateResponse{
 		Message:    "Investimento criado com sucesso",
 		Investment: *inv,
 	})
@@ -101,7 +100,7 @@ func (h *Handler) GetInvestment(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, contracts.InvestmentSingleResponse{Investment: inv})
+	c.JSON(http.StatusOK, InvestmentSingleResponse{Investment: inv})
 }
 
 func (h *Handler) MakeContribution(c *gin.Context) {
@@ -239,7 +238,7 @@ func (h *Handler) UpdateInvestment(c *gin.Context) {
 		return
 	}
 
-	updateReq := domaincontracts.UpdateInvestmentRequest{
+	updateReq := contracts.UpdateInvestmentRequestDomain{
 		UserId: userID,
 		Id:     investmentID,
 	}

@@ -18,6 +18,8 @@ type DashboardRepository struct {
 	DB *gorm.DB
 }
 
+var _ dashboard.Repository = (*DashboardRepository)(nil)
+
 func (r *DashboardRepository) GetFinancialSummary(ctx context.Context, userID ulid.ULID, accountID *ulid.ULID, month, year int) (*dashboard.FinancialSummary, error) {
 	startDate := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
 	endDate := startDate.AddDate(0, 1, 0)

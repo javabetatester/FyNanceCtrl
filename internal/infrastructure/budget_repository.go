@@ -15,6 +15,8 @@ type BudgetRepository struct {
 	DB *gorm.DB
 }
 
+var _ budget.Repository = (*BudgetRepository)(nil)
+
 type budgetDB struct {
 	Id          string    `gorm:"type:varchar(26);primaryKey;column:id"`
 	UserId      string    `gorm:"type:varchar(26);index;not null;column:user_id"`

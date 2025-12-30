@@ -14,15 +14,11 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-type TransactionCreator interface {
-	CreateTransaction(ctx context.Context, transaction *transaction.Transaction) error
-}
-
 type Service struct {
 	Repository         Repository
 	TransactionRepo    transaction.Repository
 	CategoryService    *category.Service
-	TransactionService TransactionCreator
+	TransactionService transaction.TransactionHandler
 	shared.BaseService
 }
 
@@ -30,7 +26,7 @@ func NewService(
 	repo Repository,
 	transactionRepo transaction.Repository,
 	categoryService *category.Service,
-	transactionService TransactionCreator,
+	transactionService transaction.TransactionHandler,
 	userChecker *shared.UserCheckerService,
 ) *Service {
 	return &Service{

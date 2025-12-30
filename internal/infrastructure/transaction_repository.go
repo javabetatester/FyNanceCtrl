@@ -15,6 +15,8 @@ type TransactionRepository struct {
 	DB *gorm.DB
 }
 
+var _ transaction.Repository = (*TransactionRepository)(nil)
+
 type transactionDB struct {
 	Id           string    `gorm:"type:varchar(26);primaryKey;column:id"`
 	UserId       string    `gorm:"type:varchar(26);index;not null;column:user_id"`

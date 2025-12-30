@@ -128,6 +128,14 @@ func main() {
 
 	goalService := goal.NewService(goalRepo, accountService, nil, userChecker)
 
+	var (
+		_ category.CategoryServiceInterface   = categoryService
+		_ account.AccountServiceInterface     = accountService
+		_ shared.BudgetUpdater                = budgetService
+		_ shared.GoalContributionDeleter      = goalService
+		_ shared.InvestmentTransactionDeleter = investmentService
+	)
+
 	transactionService := transaction.NewService(
 		transactionRepo,
 		categoryService,
@@ -138,12 +146,14 @@ func main() {
 		userChecker,
 	)
 
+	var _ transaction.TransactionHandler = transactionService
 	goalService.TransactionService = transactionService
 
 	dashboardService := dashboard.Service{
 		Repository: dashboardRepo,
 	}
 
+	var _ transaction.TransactionHandler = transactionService
 	recurringService := recurring.NewService(recurringRepo, transactionRepo, categoryService, transactionService, userChecker)
 
 	reportService := report.Service{

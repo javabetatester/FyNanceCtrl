@@ -16,36 +16,25 @@ import (
 	"gorm.io/gorm"
 )
 
-type BudgetUpdater interface {
-	UpdateSpent(ctx context.Context, categoryID, userID ulid.ULID, amount float64) error
-	UpdateSpentWithDate(ctx context.Context, categoryID, userID ulid.ULID, amount float64, transactionDate time.Time) error
-}
-
-type GoalContributionHandler interface {
-	DeleteContributionByTransactionId(ctx context.Context, transactionID, userID ulid.ULID) error
-}
-
-type InvestmentTransactionHandler interface {
-	DeleteInvestmentTransactionByTransactionId(ctx context.Context, transactionID, userID ulid.ULID) error
-}
-
 type Service struct {
 	Repository        Repository
-	CategoryService   *category.Service
-	AccountService    *account.Service
-	BudgetService     BudgetUpdater
-	GoalService       GoalContributionHandler
-	InvestmentService InvestmentTransactionHandler
+	CategoryService   category.CategoryServiceInterface
+	AccountService    account.AccountServiceInterface
+	BudgetService     shared.BudgetUpdater
+	GoalService       shared.GoalContributionDeleter
+	InvestmentService shared.InvestmentTransactionDeleter
 	shared.BaseService
 }
 
+var _ TransactionHandler = (*Service)(nil)
+
 func NewService(
 	repo Repository,
-	categoryService *category.Service,
-	accountService *account.Service,
-	budgetService BudgetUpdater,
-	goalService GoalContributionHandler,
-	investmentService InvestmentTransactionHandler,
+	categoryService category.CategoryServiceInterface,
+	accountService account.AccountServiceInterface,
+	budgetService shared.BudgetUpdater,
+	goalService shared.GoalContributionDeleter,
+	investmentService shared.InvestmentTransactionDeleter,
 	userChecker *shared.UserCheckerService,
 ) *Service {
 	return &Service{
