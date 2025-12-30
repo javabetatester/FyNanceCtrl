@@ -56,6 +56,11 @@ API RESTful para gestão financeira pessoal desenvolvida em Go com foco em segur
 - Visão consolidada da situação financeira
 - Relatórios e análises financeiras
 
+### Saúde Financeira
+- Cálculo de score de saúde financeira
+- Análise de orçamentos, metas, reserva de emergência e dívidas
+- Recomendações personalizadas para melhoria financeira
+
 ## Tecnologias
 
 ### Core
@@ -89,6 +94,12 @@ O projeto segue os princípios de **Clean Architecture** e **SOLID**, com separa
   - `investment/`: Investimentos
   - `dashboard/`: Dashboard e análises
   - `reports/`: Relatórios financeiros
+  - `healthscore/`: Cálculo de saúde financeira
+  - `budget/`: Orçamentos
+  - `account/`: Contas financeiras
+  - `category/`: Categorias de transações
+  - `creditcard/`: Cartões de crédito
+  - `recurring/`: Transações recorrentes
 
 - **Infrastructure Layer** (`internal/infrastructure/`): Implementações concretas de repositórios e conexão com banco de dados
   - Conexão PostgreSQL via GORM
@@ -106,6 +117,11 @@ O projeto segue os princípios de **Clean Architecture** e **SOLID**, com separa
   - Handlers para categorias
   - Handlers para metas
   - Handlers para investimentos
+  - Handlers para health score
+  - Handlers para orçamentos
+  - Handlers para contas
+  - Handlers para cartões de crédito
+  - Handlers para transações recorrentes
 
 - **Contracts Layer** (`internal/contracts/`): DTOs (Data Transfer Objects) e contratos de API
 
@@ -287,6 +303,10 @@ As migrações são executadas automaticamente via GORM AutoMigrate na inicializ
 - Transaction
 - Category
 - Investment
+- Account
+- Budget
+- CreditCard
+- RecurringTransaction
 
 ## Execução
 
@@ -383,6 +403,15 @@ swag init -g cmd/api/main.go
 - **PATCH** `/api/investments/:id` - Atualizar investimento
 - **DELETE** `/api/investments/:id` - Excluir investimento
 
+#### Saúde Financeira
+
+- **GET** `/api/health-score` - Obter score de saúde financeira
+  - Response: `{ "score": number, "status": "string", "label": "string", "color": "string", "budgetHealth": number, "goalsHealth": number, "savingsHealth": number, "recommendations": string[] }`
+
+#### Dashboard
+
+- **GET** `/api/dashboard` - Obter dados consolidados do dashboard
+
 ## Autenticação
 
 Todas as rotas privadas requerem autenticação via JWT. Para acessar essas rotas:
@@ -448,7 +477,11 @@ Fynance/
 │   │   ├── goal.go
 │   │   ├── investment.go
 │   │   ├── transaction.go
-│   │   └── user.go
+│   │   ├── user.go
+│   │   ├── healthscore.go
+│   │   ├── budget.go
+│   │   ├── account.go
+│   │   └── ...
 │   ├── domain/                        # Camada de domínio (regras de negócio)
 │   │   ├── auth/                      # Autenticação e autorização
 │   │   ├── dashboard/                 # Dashboard e análises
@@ -456,28 +489,46 @@ Fynance/
 │   │   ├── investment/                # Investimentos
 │   │   ├── reports/                   # Relatórios
 │   │   ├── transaction/               # Transações
-│   │   └── user/                      # Usuários
+│   │   ├── user/                      # Usuários
+│   │   ├── healthscore/               # Saúde financeira
+│   │   ├── budget/                    # Orçamentos
+│   │   ├── account/                   # Contas
+│   │   ├── category/                  # Categorias
+│   │   ├── creditcard/                # Cartões de crédito
+│   │   └── recurring/                 # Transações recorrentes
 │   ├── infrastructure/                # Camada de infraestrutura
 │   │   ├── db.go                      # Conexão com banco de dados
 │   │   ├── goal_repository.go
 │   │   ├── investment_repository.go
 │   │   ├── transaction_category_repository.go
 │   │   ├── transaction_repository.go
-│   │   └── user_repository.go
+│   │   ├── user_repository.go
+│   │   ├── budget_repository.go
+│   │   ├── account_repository.go
+│   │   └── ...
 │   ├── middleware/                    # Middlewares HTTP
 │   │   ├── auth.go                    # Middleware de autenticação
 │   │   ├── jwt.go                     # Serviço JWT
 │   │   ├── jwt_service.go
-│   │   └── plan_validator.go          # Validação de planos
+│   │   ├── plan_validator.go          # Validação de planos
+│   │   ├── plan_limiter.go            # Limites de planos
+│   │   ├── rate_limiter.go            # Rate limiting
+│   │   └── cors.go                    # CORS
 │   ├── routes/                        # Handlers HTTP
 │   │   ├── authentication.go
 │   │   ├── goal.go
 │   │   ├── handler.go
 │   │   ├── investment.go
 │   │   ├── transaction_category.go
-│   │   └── transaction.go
-│   └── utils/                         # Utilitários
-│       └── ulid_pkg.go
+│   │   ├── transaction.go
+│   │   ├── healthscore.go
+│   │   ├── budget.go
+│   │   ├── account.go
+│   │   └── ...
+│   └── pkg/                           # Utilitários e pacotes compartilhados
+│       ├── pagination.go
+│       ├── ulid_utils.go
+│       └── query/                     # Query builder
 ├── docs/                              # Documentação Swagger
 │   ├── docs.go
 │   ├── swagger.json

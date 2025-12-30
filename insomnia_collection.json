@@ -2304,20 +2304,7 @@
 			"url": "{{ _.base_url }}/api/credit-cards/{{ _.credit_card_id }}/transactions",
 			"method": "GET",
 			"body": {},
-			"parameters": [
-				{
-					"name": "page",
-					"value": "1",
-					"disabled": false,
-					"description": "Numero da pagina (padrao: 1)"
-				},
-				{
-					"name": "limit",
-					"value": "10",
-					"disabled": false,
-					"description": "Itens por pagina (padrao: 10, max: 100)"
-				}
-			],
+			"parameters": [],
 			"headers": [
 				{
 					"name": "Authorization",
