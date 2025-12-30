@@ -585,7 +585,59 @@ Contribuições são bem-vindas! Para contribuir:
 
 ## Licença
 
-Este projeto está licenciado sob a [MIT License](LICENSE).
+Este projeto está sob **Licença Proprietária - Proibida Monetização**. 
+
+**✅ PERMITIDO - QUALQUER USO:**
+- ✅ **Qualquer uso que NÃO envolva monetização**
+- ✅ Estudo, aprendizado e pesquisa
+- ✅ Incorporação em outros projetos (open source, privado, pessoal, etc.)
+- ✅ Criação de obras derivadas
+- ✅ Modificação, distribuição e compartilhamento
+- ✅ Fork e contribuições para este projeto
+- ✅ Uso em projetos pessoais, comerciais (não monetizados), experimentais
+- ✅ Uso educacional e acadêmico
+- ✅ Copiar código, funções ou módulos para outros projetos
+- ✅ Usar padrões arquiteturais em outros projetos
+- ✅ Criar aplicações baseadas neste código
+- ✅ Uso interno em empresas (desde que não vendido/licenciado)
+
+**Resumindo: PODE USAR EM QUALQUER COISA, MENOS PARA MONETIZAR!**
+
+**❌ ESTRITAMENTE PROIBIDO - APENAS MONETIZAÇÃO:**
+- ❌ **Qualquer forma de monetização ou comercialização**
+- ❌ Venda do código ou obras derivadas
+- ❌ Licenciamento do código por taxa
+- ❌ Uso em produtos ou serviços comerciais onde há cobrança
+- ❌ Uso em Software-as-a-Service (SaaS) com cobrança
+- ❌ Geração de receita através de publicidade relacionada ao código
+- ❌ Cobrança de taxas, assinaturas ou qualquer forma de pagamento
+- ❌ Qualquer método de obter ganho financeiro do código
+
+Para mais informações sobre os termos de uso, consulte o arquivo [LICENSE](LICENSE).
+
+**⚠️ AVISO LEGAL CRÍTICO:**
+
+**A única restrição é: NÃO MONETIZE!**
+
+Você pode usar este código para **QUALQUER OUTRO PROPÓSITO**:
+- ✅ Em outros projetos
+- ✅ Para estudo
+- ✅ Para criar aplicações
+- ✅ Para compartilhar
+- ✅ Para qualquer coisa que NÃO envolva ganho financeiro
+
+**MAS:** Qualquer tentativa de **MONETIZAR** este código constitui **VIOLAÇÃO DE DIREITOS AUTORAIS** e pode resultar em **AÇÃO JUDICIAL IMEDIATA**, incluindo:
+
+- **Processo civil por violação de direitos autorais**
+- **Indenização por danos materiais e morais**
+- **Danos estatutários** (até $150.000 por obra nos EUA)
+- **Perdas e danos** (incluindo todos os lucros obtidos com uso não autorizado)
+- **Custas processuais e honorários advocatícios**
+- **Medidas cautelares** para cessação imediata do uso não autorizado
+
+**Resumindo:**
+- ✅ **Qualquer uso = PERMITIDO** (desde que não monetize)
+- ❌ **Monetização = PROCESSO LEGAL** ⚠️
 
 ---
 
