@@ -124,24 +124,27 @@ func main() {
 
 	budgetService := budget.NewService(budgetRepo, categoryService, userChecker)
 
-	transactionService := transaction.NewService(transactionRepo, categoryService, accountService, userChecker)
-	transactionService.SetBudgetService(budgetService)
-
-	goalService := goal.NewService(goalRepo, accountService, userChecker)
-	goalService.SetTransactionService(transactionService)
-
-	transactionService.SetGoalService(goalService)
-
 	investmentService := investment.NewService(investmentRepo, transactionRepo, accountService, userChecker)
 
-	transactionService.SetInvestmentService(investmentService)
+	goalService := goal.NewService(goalRepo, accountService, nil, userChecker)
+
+	transactionService := transaction.NewService(
+		transactionRepo,
+		categoryService,
+		accountService,
+		budgetService,
+		goalService,
+		investmentService,
+		userChecker,
+	)
+
+	goalService.TransactionService = transactionService
 
 	dashboardService := dashboard.Service{
 		Repository: dashboardRepo,
 	}
 
-	recurringService := recurring.NewService(recurringRepo, transactionRepo, categoryService, userChecker)
-	recurringService.SetTransactionService(transactionService)
+	recurringService := recurring.NewService(recurringRepo, transactionRepo, categoryService, transactionService, userChecker)
 
 	reportService := report.Service{
 		Repository:  reportRepo,
@@ -186,7 +189,7 @@ func main() {
 	router := gin.Default()
 	router.Use(middleware.CORSMiddleware())
 
-	authRateLimiter := middleware.NewRateLimiter(10, time.Minute)
+	authRateLimiter := middleware.NewRateLimiter(100, time.Minute)
 
 	docs.SwaggerInfo.BasePath = "/api"
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
@@ -311,8 +314,8 @@ func main() {
 			creditCards.GET("/:id/invoices/current", handler.GetCurrentInvoice)
 			creditCards.GET("/:id/invoices/:invoiceId", handler.GetInvoice)
 			creditCards.POST("/:id/invoices/:invoiceId/pay", handler.PayInvoice)
-		creditCards.POST("/:id/transactions", handler.CreateCreditCardTransaction)
-		creditCards.GET("/:id/transactions", handler.ListCreditCardTransactions)
+			creditCards.POST("/:id/transactions", handler.CreateCreditCardTransaction)
+			creditCards.GET("/:id/transactions", handler.ListCreditCardTransactions)
 		}
 
 		healthScoreService := healthscore.NewService()

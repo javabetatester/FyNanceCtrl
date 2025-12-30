@@ -7,7 +7,6 @@ import (
 	"Fynance/internal/domain/account"
 	appErrors "Fynance/internal/errors"
 	"Fynance/internal/pkg"
-	"Fynance/internal/pkg/query"
 
 	"github.com/gin-gonic/gin"
 )
@@ -62,26 +61,28 @@ func (h *Handler) ListAccounts(c *gin.Context) {
 
 	ctx := c.Request.Context()
 
-	page := h.parsePage(c)
-	q := h.AccountRepository.FindByUser(ctx, userID)
-
+	var accountType *string
 	typeStr := c.Query("type")
 	if typeStr != "" && typeStr != "ALL" {
-		q = q.Where("type = ?", typeStr)
+		accountType = &typeStr
 	}
 
+	var search *string
 	searchStr := c.Query("search")
 	if searchStr != "" {
-		q = q.Where("name ILIKE ?", "%"+searchStr+"%")
+		search = &searchStr
 	}
 
-	result, err := query.Execute(q, page, h.AccountRepository.Converter())
+	pagination := h.parsePagination(c)
+
+	accounts, total, err := h.AccountRepository.GetByUserIDWithFilters(ctx, userID, accountType, search, pagination)
 	if err != nil {
-		h.respondError(c, appErrors.NewDatabaseError(err))
+		h.respondError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, result)
+	response := pkg.NewPaginatedResponse(accounts, pagination.Page, pagination.Limit, total)
+	c.JSON(http.StatusOK, response)
 }
 
 func (h *Handler) GetAccount(c *gin.Context) {

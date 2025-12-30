@@ -45,7 +45,7 @@ func (s *Service) CreateBudget(ctx context.Context, req *CreateBudgetRequest) (*
 		return nil, err
 	}
 
-	existing, _ := s.Repository.GetByCategoryId(ctx, categoryID, req.UserId, req.Month, req.Year)
+	existing, _ := s.Repository.GetByCategoryID(ctx, categoryID, req.UserId, req.Month, req.Year)
 	if existing != nil {
 		return nil, appErrors.NewConflictError("orcamento para esta categoria neste periodo")
 	}
@@ -115,7 +115,7 @@ func (s *Service) DeleteBudget(ctx context.Context, budgetID, userID ulid.ULID) 
 }
 
 func (s *Service) GetBudgetByID(ctx context.Context, budgetID, userID ulid.ULID) (*Budget, error) {
-	budget, err := s.Repository.GetById(ctx, budgetID, userID)
+	budget, err := s.Repository.GetByID(ctx, budgetID, userID)
 	if err != nil {
 		return nil, appErrors.ErrNotFound.WithError(err)
 	}
@@ -132,7 +132,7 @@ func (s *Service) ListBudgets(ctx context.Context, userID ulid.ULID, month, year
 		return nil, 0, err
 	}
 
-	return s.Repository.GetByUserId(ctx, userID, month, year, filters, pagination)
+	return s.Repository.GetByUserID(ctx, userID, month, year, filters, pagination)
 }
 
 func (s *Service) GetBudgetSummary(ctx context.Context, userID ulid.ULID, month, year int) (*BudgetSummary, error) {
@@ -150,13 +150,13 @@ func (s *Service) UpdateSpent(ctx context.Context, categoryID, userID ulid.ULID,
 }
 
 func (s *Service) UpdateSpentWithDate(ctx context.Context, categoryID, userID ulid.ULID, amount float64, transactionDate time.Time) error {
-	budget, err := s.Repository.GetByCategoryId(ctx, categoryID, userID, int(transactionDate.Month()), transactionDate.Year())
+	budget, err := s.Repository.GetByCategoryID(ctx, categoryID, userID, int(transactionDate.Month()), transactionDate.Year())
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			resolvedID, resolveErr := s.resolveCategoryID(ctx, categoryID, userID)
 			if resolveErr == nil && resolvedID != categoryID {
-				budget, err = s.Repository.GetByCategoryId(ctx, resolvedID, userID, int(transactionDate.Month()), transactionDate.Year())
+				budget, err = s.Repository.GetByCategoryID(ctx, resolvedID, userID, int(transactionDate.Month()), transactionDate.Year())
 				if err == nil && budget != nil {
 					return s.Repository.UpdateSpent(ctx, budget.Id, amount)
 				}
@@ -201,7 +201,7 @@ func (s *Service) CreateRecurringBudgets(ctx context.Context, userID ulid.ULID) 
 	currentYear := now.Year()
 
 	for _, budget := range recurring {
-		existing, _ := s.Repository.GetByCategoryId(ctx, budget.CategoryId, userID, currentMonth, currentYear)
+		existing, _ := s.Repository.GetByCategoryID(ctx, budget.CategoryId, userID, currentMonth, currentYear)
 		if existing != nil {
 			continue
 		}

@@ -132,7 +132,7 @@ func (r *RecurringRepository) Delete(ctx context.Context, recurringID, userID ul
 	return r.DB.WithContext(ctx).Where("id = ? AND user_id = ?", recurringID.String(), userID.String()).Delete(&recurringDB{}).Error
 }
 
-func (r *RecurringRepository) GetById(ctx context.Context, recurringID, userID ulid.ULID) (*recurring.RecurringTransaction, error) {
+func (r *RecurringRepository) GetByID(ctx context.Context, recurringID, userID ulid.ULID) (*recurring.RecurringTransaction, error) {
 	var rdb recurringDB
 	err := r.DB.WithContext(ctx).
 		Table("recurring_transactions r").
@@ -154,7 +154,7 @@ func (r *RecurringRepository) GetById(ctx context.Context, recurringID, userID u
 	return rec, nil
 }
 
-func (r *RecurringRepository) GetByUserId(ctx context.Context, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*recurring.RecurringTransaction, int64, error) {
+func (r *RecurringRepository) GetByUserID(ctx context.Context, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*recurring.RecurringTransaction, int64, error) {
 	if pagination == nil {
 		pagination = &pkg.PaginationParams{Page: 1, Limit: 10}
 	}
@@ -192,7 +192,7 @@ func (r *RecurringRepository) GetByUserId(ctx context.Context, userID ulid.ULID,
 	return transactions, total, nil
 }
 
-func (r *RecurringRepository) GetActiveByUserId(ctx context.Context, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*recurring.RecurringTransaction, int64, error) {
+func (r *RecurringRepository) GetActiveByUserID(ctx context.Context, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*recurring.RecurringTransaction, int64, error) {
 	if pagination == nil {
 		pagination = &pkg.PaginationParams{Page: 1, Limit: 10}
 	}

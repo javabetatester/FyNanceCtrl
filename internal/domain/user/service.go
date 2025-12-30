@@ -44,7 +44,7 @@ func (s *Service) Delete(ctx context.Context, id ulid.ULID) error {
 }
 
 func (s *Service) GetByID(ctx context.Context, id ulid.ULID) (*User, error) {
-	user, err := s.Repository.GetById(ctx, id)
+	user, err := s.Repository.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}

@@ -14,7 +14,7 @@ type InvestmentCreateRequest struct {
 type InvestmentUpdateRequest struct {
 	Name           *string  `json:"name" binding:"omitempty"`
 	Type           *string  `json:"type" binding:"omitempty,oneof=CDB LCI LCA TESOURO_DIRETO ACOES FUNDOS CRIPTOMOEDAS PREVIDENCIA"`
-	CurrentBalance *float64 `json:"current_balance" binding:"omitempty,gt=0"`
+	CurrentBalance *float64 `json:"current_balance" binding:"omitempty,gte=0"`
 }
 
 type InvestmentContributionRequest struct {

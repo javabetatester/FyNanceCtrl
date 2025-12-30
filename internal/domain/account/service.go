@@ -114,7 +114,7 @@ func (s *Service) DeleteAccount(ctx context.Context, accountID, userID ulid.ULID
 }
 
 func (s *Service) GetAccountByID(ctx context.Context, accountID, userID ulid.ULID) (*Account, error) {
-	account, err := s.Repository.GetById(ctx, accountID, userID)
+	account, err := s.Repository.GetByID(ctx, accountID, userID)
 	if err != nil {
 		return nil, appErrors.ErrNotFound.WithError(err)
 	}
@@ -131,7 +131,7 @@ func (s *Service) ListAccounts(ctx context.Context, userID ulid.ULID, pagination
 		return nil, 0, err
 	}
 
-	return s.Repository.GetByUserId(ctx, userID, pagination)
+	return s.Repository.GetByUserID(ctx, userID, pagination)
 }
 
 func (s *Service) ListActiveAccounts(ctx context.Context, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*Account, int64, error) {
@@ -139,7 +139,7 @@ func (s *Service) ListActiveAccounts(ctx context.Context, userID ulid.ULID, pagi
 		return nil, 0, err
 	}
 
-	return s.Repository.GetActiveByUserId(ctx, userID, pagination)
+	return s.Repository.GetActiveByUserID(ctx, userID, pagination)
 }
 
 func (s *Service) UpdateBalance(ctx context.Context, accountID, userID ulid.ULID, amount float64) error {

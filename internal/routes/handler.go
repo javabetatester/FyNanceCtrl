@@ -17,7 +17,6 @@ import (
 	"Fynance/internal/logger"
 	"Fynance/internal/middleware"
 	"Fynance/internal/pkg"
-	"Fynance/internal/pkg/query"
 
 	"github.com/gin-gonic/gin"
 	"github.com/oklog/ulid/v2"
@@ -59,10 +58,6 @@ func (h *Handler) GetUserIDFromContext(c *gin.Context) (ulid.ULID, error) {
 	}
 
 	return userID, nil
-}
-
-func (h *Handler) parsePage(c *gin.Context) query.Page {
-	return query.ParsePageFromGin(c)
 }
 
 func (h *Handler) parsePagination(c *gin.Context) *pkg.PaginationParams {

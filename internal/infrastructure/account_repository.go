@@ -6,7 +6,6 @@ import (
 
 	"Fynance/internal/domain/account"
 	"Fynance/internal/pkg"
-	"Fynance/internal/pkg/query"
 
 	"github.com/oklog/ulid/v2"
 	"gorm.io/gorm"
@@ -107,7 +106,7 @@ func (r *AccountRepository) Delete(ctx context.Context, accountID, userID ulid.U
 	return r.DB.WithContext(ctx).Where("id = ? AND user_id = ?", accountID.String(), userID.String()).Delete(&accountDB{}).Error
 }
 
-func (r *AccountRepository) GetById(ctx context.Context, accountID, userID ulid.ULID) (*account.Account, error) {
+func (r *AccountRepository) GetByID(ctx context.Context, accountID, userID ulid.ULID) (*account.Account, error) {
 	var adb accountDB
 	err := r.DB.WithContext(ctx).Where("id = ? AND user_id = ?", accountID.String(), userID.String()).First(&adb).Error
 	if err != nil {
@@ -116,35 +115,31 @@ func (r *AccountRepository) GetById(ctx context.Context, accountID, userID ulid.
 	return toDomainAccount(&adb)
 }
 
-func (r *AccountRepository) FindByUser(ctx context.Context, userID ulid.ULID) *query.Query[accountDB] {
-	return query.New[accountDB](r.DB, "accounts").
-		Context(ctx).
-		Where("user_id = ? AND type != ?", userID.String(), string(account.TypeCreditCard)).
-		Order("created_at DESC")
-}
-
-func (r *AccountRepository) FindActiveByUser(ctx context.Context, userID ulid.ULID) *query.Query[accountDB] {
-	return query.New[accountDB](r.DB, "accounts").
-		Context(ctx).
-		Where("user_id = ? AND is_active = ? AND type != ?", userID.String(), true, string(account.TypeCreditCard)).
-		Order("created_at DESC")
-}
-
-func (r *AccountRepository) Converter() func(*accountDB) (*account.Account, error) {
-	return toDomainAccount
-}
-
-func (r *AccountRepository) GetByUserId(ctx context.Context, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*account.Account, int64, error) {
+func (r *AccountRepository) GetByUserID(ctx context.Context, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*account.Account, int64, error) {
 	baseQuery := r.DB.WithContext(ctx).Table("accounts").Where("user_id = ? AND type != ?", userID.String(), string(account.TypeCreditCard))
 	return pkg.Paginate(baseQuery, pagination, "created_at DESC", toDomainAccount)
 }
 
-func (r *AccountRepository) GetActiveByUserId(ctx context.Context, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*account.Account, int64, error) {
+func (r *AccountRepository) GetActiveByUserID(ctx context.Context, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*account.Account, int64, error) {
 	baseQuery := r.DB.WithContext(ctx).Table("accounts").Where("user_id = ? AND is_active = ? AND type != ?", userID.String(), true, string(account.TypeCreditCard))
 	return pkg.Paginate(baseQuery, pagination, "created_at DESC", toDomainAccount)
 }
 
-func (r *AccountRepository) GetByCreditCardId(ctx context.Context, creditCardID, userID ulid.ULID) (*account.Account, error) {
+func (r *AccountRepository) GetByUserIDWithFilters(ctx context.Context, userID ulid.ULID, accountType *string, search *string, pagination *pkg.PaginationParams) ([]*account.Account, int64, error) {
+	baseQuery := r.DB.WithContext(ctx).Table("accounts").Where("user_id = ? AND type != ?", userID.String(), string(account.TypeCreditCard))
+
+	if accountType != nil && *accountType != "" && *accountType != "ALL" {
+		baseQuery = baseQuery.Where("type = ?", *accountType)
+	}
+
+	if search != nil && *search != "" {
+		baseQuery = baseQuery.Where("name ILIKE ?", "%"+*search+"%")
+	}
+
+	return pkg.Paginate(baseQuery, pagination, "created_at DESC", toDomainAccount)
+}
+
+func (r *AccountRepository) GetByCreditCardID(ctx context.Context, creditCardID, userID ulid.ULID) (*account.Account, error) {
 	var adb accountDB
 	err := r.DB.WithContext(ctx).Where("credit_card_id = ? AND user_id = ?", creditCardID.String(), userID.String()).First(&adb).Error
 	if err != nil {

@@ -2,6 +2,7 @@ package goal
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"Fynance/internal/pkg"
 
 	"github.com/oklog/ulid/v2"
+	"gorm.io/gorm"
 )
 
 type TransactionHandler interface {
@@ -28,18 +30,15 @@ type Service struct {
 	shared.BaseService
 }
 
-func NewService(repo Repository, accountService *account.Service, userChecker *shared.UserCheckerService) *Service {
+func NewService(repo Repository, accountService *account.Service, transactionService TransactionHandler, userChecker *shared.UserCheckerService) *Service {
 	return &Service{
-		Repository:     repo,
-		AccountService: accountService,
+		Repository:         repo,
+		AccountService:     accountService,
+		TransactionService: transactionService,
 		BaseService: shared.BaseService{
 			UserChecker: userChecker,
 		},
 	}
-}
-
-func (s *Service) SetTransactionService(transactionService TransactionHandler) {
-	s.TransactionService = transactionService
 }
 
 func (s *Service) CreateGoal(ctx context.Context, request *domaincontracts.GoalCreateRequest) error {
@@ -202,11 +201,11 @@ func (s *Service) GetContributions(ctx context.Context, goalID, userID ulid.ULID
 		return nil, err
 	}
 
-	return s.Repository.GetContributionsByGoalId(ctx, goalID, userID)
+	return s.Repository.GetContributionsByGoalID(ctx, goalID, userID)
 }
 
 func (s *Service) DeleteContribution(ctx context.Context, contributionID, userID ulid.ULID) error {
-	contribution, err := s.Repository.GetContributionById(ctx, contributionID, userID)
+	contribution, err := s.Repository.GetContributionByID(ctx, contributionID, userID)
 	if err != nil {
 		return err
 	}
@@ -252,7 +251,7 @@ func (s *Service) DeleteContribution(ctx context.Context, contributionID, userID
 }
 
 func (s *Service) DeleteContributionByTransactionId(ctx context.Context, transactionID, userID ulid.ULID) error {
-	contribution, err := s.Repository.GetContributionByTransactionId(ctx, transactionID, userID)
+	contribution, err := s.Repository.GetContributionByTransactionID(ctx, transactionID, userID)
 	if err != nil {
 		return err
 	}
@@ -327,9 +326,12 @@ func (s *Service) UpdateGoal(ctx context.Context, request *domaincontracts.GoalU
 		return err
 	}
 
-	current, err := s.Repository.GetById(ctx, request.Id)
+	current, err := s.Repository.GetByID(ctx, request.Id)
 	if err != nil {
-		return err
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return appErrors.ErrGoalNotFound.WithError(err)
+		}
+		return appErrors.NewDatabaseError(err)
 	}
 
 	current.Name = request.Name
@@ -344,15 +346,28 @@ func (s *Service) DeleteGoal(ctx context.Context, goalID ulid.ULID, userID ulid.
 	if err := s.CheckGoalBelongsToUser(ctx, goalID, userID); err != nil {
 		return err
 	}
-	return s.Repository.Delete(ctx, goalID)
+	if err := s.Repository.Delete(ctx, goalID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return appErrors.ErrGoalNotFound.WithError(err)
+		}
+		return appErrors.NewDatabaseError(err)
+	}
+	return nil
 }
 
 func (s *Service) GetGoalByID(ctx context.Context, goalID ulid.ULID, userID ulid.ULID) (*Goal, error) {
-	return s.Repository.GetByIdAndUser(ctx, goalID, userID)
+	goal, err := s.Repository.GetByIDAndUser(ctx, goalID, userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, appErrors.ErrGoalNotFound.WithError(err)
+		}
+		return nil, appErrors.NewDatabaseError(err)
+	}
+	return goal, nil
 }
 
 func (s *Service) GetGoalsByUserID(ctx context.Context, userID ulid.ULID, filters *GoalFilters, pagination *pkg.PaginationParams) ([]*Goal, int64, error) {
-	return s.Repository.GetByUserId(ctx, userID, filters, pagination)
+	return s.Repository.GetByUserID(ctx, userID, filters, pagination)
 }
 
 func (s *Service) ListGoals(ctx context.Context, pagination *pkg.PaginationParams) ([]*Goal, int64, error) {

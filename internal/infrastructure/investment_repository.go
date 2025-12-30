@@ -2,11 +2,9 @@ package infrastructure
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"Fynance/internal/domain/investment"
-	appErrors "Fynance/internal/errors"
 	"Fynance/internal/pkg"
 
 	"github.com/oklog/ulid/v2"
@@ -33,11 +31,11 @@ type investmentDB struct {
 func toDomainInvestment(idb *investmentDB) (*investment.Investment, error) {
 	id, err := pkg.ParseULID(idb.Id)
 	if err != nil {
-		return nil, appErrors.ErrInternalServer.WithError(err)
+		return nil, err
 	}
 	uid, err := pkg.ParseULID(idb.UserId)
 	if err != nil {
-		return nil, appErrors.ErrInternalServer.WithError(err)
+		return nil, err
 	}
 	return &investment.Investment{
 		Id:              id,
@@ -70,111 +68,49 @@ func toDBInvestment(inv *investment.Investment) *investmentDB {
 
 func (r *InvestmentRepository) Create(ctx context.Context, inv *investment.Investment) error {
 	idb := toDBInvestment(inv)
-	if err := r.DB.WithContext(ctx).Table("investments").Create(idb).Error; err != nil {
-		return appErrors.NewDatabaseError(err)
-	}
-	return nil
+	return r.DB.WithContext(ctx).Table("investments").Create(idb).Error
 }
 
 func (r *InvestmentRepository) List(ctx context.Context, userId ulid.ULID, filters *investment.InvestmentFilters, pagination *pkg.PaginationParams) ([]*investment.Investment, int64, error) {
-	if pagination == nil {
-		pagination = &pkg.PaginationParams{Page: 1, Limit: 10}
-	}
-	pagination.Normalize()
-
 	baseQuery := r.DB.WithContext(ctx).Table("investments").Where("user_id = ?", userId.String())
 
 	if filters != nil && filters.Type != nil && *filters.Type != "" && *filters.Type != "ALL" {
 		baseQuery = baseQuery.Where("type = ?", *filters.Type)
 	}
 
-	var total int64
-	if err := baseQuery.Count(&total).Error; err != nil {
-		return nil, 0, appErrors.NewDatabaseError(err)
-	}
-
-	var rows []investmentDB
-	err := baseQuery.Order("application_date DESC").
-		Offset(pagination.Offset()).
-		Limit(pagination.Limit).
-		Find(&rows).Error
-	if err != nil {
-		return nil, 0, appErrors.NewDatabaseError(err)
-	}
-	out := make([]*investment.Investment, 0, len(rows))
-	for i := range rows {
-		inv, err := toDomainInvestment(&rows[i])
-		if err != nil {
-			return nil, 0, err
-		}
-		out = append(out, inv)
-	}
-	return out, total, nil
+	return pkg.Paginate(baseQuery, pagination, "application_date DESC", toDomainInvestment)
 }
 
 func (r *InvestmentRepository) Update(ctx context.Context, inv *investment.Investment) error {
 	idb := toDBInvestment(inv)
-	if err := r.DB.WithContext(ctx).Table("investments").Where("id = ?", idb.Id).Updates(idb).Error; err != nil {
-		return appErrors.NewDatabaseError(err)
-	}
-	return nil
+	return r.DB.WithContext(ctx).Table("investments").Where("id = ?", idb.Id).Updates(idb).Error
 }
 
 func (r *InvestmentRepository) Delete(ctx context.Context, id ulid.ULID, userId ulid.ULID) error {
 	result := r.DB.WithContext(ctx).Table("investments").Where("id = ? AND user_id = ?", id.String(), userId.String()).
 		Delete(&investmentDB{})
 	if result.Error != nil {
-		return appErrors.NewDatabaseError(result.Error)
+		return result.Error
 	}
 	if result.RowsAffected == 0 {
-		return appErrors.ErrInvestmentNotFound
+		return gorm.ErrRecordNotFound
 	}
 	return nil
 }
 
-func (r *InvestmentRepository) GetInvestmentById(ctx context.Context, id ulid.ULID, userId ulid.ULID) (*investment.Investment, error) {
+func (r *InvestmentRepository) GetInvestmentByID(ctx context.Context, id ulid.ULID, userId ulid.ULID) (*investment.Investment, error) {
 	var row investmentDB
 	err := r.DB.WithContext(ctx).Table("investments").Where("id = ? AND user_id = ?", id.String(), userId.String()).
 		First(&row).Error
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, appErrors.ErrInvestmentNotFound.WithError(err)
-		}
-		return nil, appErrors.NewDatabaseError(err)
+		return nil, err
 	}
 	return toDomainInvestment(&row)
 }
 
-func (r *InvestmentRepository) GetByUserId(ctx context.Context, userId ulid.ULID, pagination *pkg.PaginationParams) ([]*investment.Investment, int64, error) {
-	if pagination == nil {
-		pagination = &pkg.PaginationParams{Page: 1, Limit: 10}
-	}
-	pagination.Normalize()
-
+func (r *InvestmentRepository) GetByUserID(ctx context.Context, userId ulid.ULID, pagination *pkg.PaginationParams) ([]*investment.Investment, int64, error) {
 	baseQuery := r.DB.WithContext(ctx).Table("investments").Where("user_id = ?", userId.String())
-
-	var total int64
-	if err := baseQuery.Count(&total).Error; err != nil {
-		return nil, 0, appErrors.NewDatabaseError(err)
-	}
-
-	var rows []investmentDB
-	err := baseQuery.Order("application_date DESC").
-		Offset(pagination.Offset()).
-		Limit(pagination.Limit).
-		Find(&rows).Error
-	if err != nil {
-		return nil, 0, appErrors.NewDatabaseError(err)
-	}
-	out := make([]*investment.Investment, 0, len(rows))
-	for i := range rows {
-		inv, err := toDomainInvestment(&rows[i])
-		if err != nil {
-			return nil, 0, err
-		}
-		out = append(out, inv)
-	}
-	return out, total, nil
+	return pkg.Paginate(baseQuery, pagination, "application_date DESC", toDomainInvestment)
 }
 
 func (r *InvestmentRepository) GetTotalBalance(ctx context.Context, userId ulid.ULID) (float64, error) {
@@ -183,42 +119,12 @@ func (r *InvestmentRepository) GetTotalBalance(ctx context.Context, userId ulid.
 		Where("user_id = ?", userId.String()).
 		Select("COALESCE(SUM(current_balance), 0)").
 		Scan(&total).Error
-	if err != nil {
-		return 0, appErrors.NewDatabaseError(err)
-	}
-	return total, nil
+	return total, err
 }
 
 func (r *InvestmentRepository) GetByType(ctx context.Context, userId ulid.ULID, investmentType investment.Types, pagination *pkg.PaginationParams) ([]*investment.Investment, int64, error) {
-	if pagination == nil {
-		pagination = &pkg.PaginationParams{Page: 1, Limit: 10}
-	}
-	pagination.Normalize()
-
 	baseQuery := r.DB.WithContext(ctx).Table("investments").Where("user_id = ? AND type = ?", userId.String(), string(investmentType))
-
-	var total int64
-	if err := baseQuery.Count(&total).Error; err != nil {
-		return nil, 0, appErrors.NewDatabaseError(err)
-	}
-
-	var rows []investmentDB
-	err := baseQuery.Order("application_date DESC").
-		Offset(pagination.Offset()).
-		Limit(pagination.Limit).
-		Find(&rows).Error
-	if err != nil {
-		return nil, 0, appErrors.NewDatabaseError(err)
-	}
-	out := make([]*investment.Investment, 0, len(rows))
-	for i := range rows {
-		inv, err := toDomainInvestment(&rows[i])
-		if err != nil {
-			return nil, 0, err
-		}
-		out = append(out, inv)
-	}
-	return out, total, nil
+	return pkg.Paginate(baseQuery, pagination, "application_date DESC", toDomainInvestment)
 }
 
 func (r *InvestmentRepository) UpdateBalanceAtomic(ctx context.Context, investmentID ulid.ULID, delta float64) error {
@@ -226,10 +132,10 @@ func (r *InvestmentRepository) UpdateBalanceAtomic(ctx context.Context, investme
 		UpdateColumn("current_balance", gorm.Expr("current_balance + ?", delta)).
 		UpdateColumn("updated_at", time.Now())
 	if result.Error != nil {
-		return appErrors.NewDatabaseError(result.Error)
+		return result.Error
 	}
 	if result.RowsAffected == 0 {
-		return appErrors.ErrInvestmentNotFound
+		return gorm.ErrRecordNotFound
 	}
 	return nil
 }

@@ -175,6 +175,17 @@ func (s *Service) ValidateAndEnsureExists(ctx context.Context, categoryID, userI
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		defaultCat := FindDefaultCategoryByID(userID, categoryID)
 		if defaultCat == nil {
+			_ = s.CreateDefaultCategories(ctx, userID)
+			category, err = s.Repository.GetByID(ctx, categoryID, userID)
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return appErrors.ErrCategoryNotFound
+			}
+			if err != nil {
+				return appErrors.NewDatabaseError(err)
+			}
+			if category != nil {
+				return nil
+			}
 			return appErrors.ErrCategoryNotFound
 		}
 

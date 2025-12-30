@@ -89,7 +89,7 @@ func (s *Service) MakeContribution(ctx context.Context, investmentID, accountID,
 		return appErrors.NewValidationError("amount", "deve ser maior que zero")
 	}
 
-	if _, err := s.Repository.GetInvestmentById(ctx, investmentID, userID); err != nil {
+	if _, err := s.Repository.GetInvestmentByID(ctx, investmentID, userID); err != nil {
 		return err
 	}
 
@@ -129,7 +129,7 @@ func (s *Service) MakeWithdraw(ctx context.Context, investmentID, accountID, use
 		return appErrors.NewValidationError("amount", "deve ser maior que zero")
 	}
 
-	investment, err := s.Repository.GetInvestmentById(ctx, investmentID, userID)
+	investment, err := s.Repository.GetInvestmentByID(ctx, investmentID, userID)
 	if err != nil {
 		return err
 	}
@@ -177,11 +177,11 @@ func (s *Service) GetInvestment(ctx context.Context, investmentID, userID ulid.U
 	if err := s.EnsureUserExists(ctx, userID); err != nil {
 		return nil, err
 	}
-	return s.Repository.GetInvestmentById(ctx, investmentID, userID)
+	return s.Repository.GetInvestmentByID(ctx, investmentID, userID)
 }
 
 func (s *Service) GetTotalInvested(ctx context.Context, investmentID, userID ulid.ULID) (float64, error) {
-	transactions, _, err := s.TransactionRepo.GetByInvestmentId(ctx, investmentID, userID, nil)
+	transactions, _, err := s.TransactionRepo.GetByInvestmentID(ctx, investmentID, userID, nil)
 	if err != nil {
 		return 0, err
 	}
@@ -200,7 +200,7 @@ func (s *Service) GetTotalInvested(ctx context.Context, investmentID, userID uli
 }
 
 func (s *Service) CalculateReturn(ctx context.Context, investmentID, userID ulid.ULID) (float64, float64, error) {
-	investment, err := s.Repository.GetInvestmentById(ctx, investmentID, userID)
+	investment, err := s.Repository.GetInvestmentByID(ctx, investmentID, userID)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -221,13 +221,24 @@ func (s *Service) CalculateReturn(ctx context.Context, investmentID, userID ulid
 }
 
 func (s *Service) DeleteInvestment(ctx context.Context, investmentID, userID ulid.ULID) error {
-	investment, err := s.Repository.GetInvestmentById(ctx, investmentID, userID)
+	investment, err := s.Repository.GetInvestmentByID(ctx, investmentID, userID)
 	if err != nil {
 		return err
 	}
 
 	if investment.CurrentBalance > 0 {
-		return appErrors.NewValidationError("investment", "Possui saldo, não pode remover")
+		return appErrors.NewValidationError("investment", "Não é possível excluir investimento com saldo. Faça um resgate total antes de excluir.")
+	}
+
+	transactions, _, err := s.TransactionRepo.GetByInvestmentID(ctx, investmentID, userID, nil)
+	if err != nil {
+		return err
+	}
+
+	for _, tx := range transactions {
+		if err := s.TransactionRepo.Delete(ctx, tx.Id); err != nil {
+			return err
+		}
 	}
 
 	return s.Repository.Delete(ctx, investmentID, userID)
@@ -243,7 +254,7 @@ func (s *Service) DeleteInvestmentTransactionByTransactionId(ctx context.Context
 		return nil
 	}
 
-	investment, err := s.Repository.GetInvestmentById(ctx, *tx.InvestmentId, userID)
+	investment, err := s.Repository.GetInvestmentByID(ctx, *tx.InvestmentId, userID)
 	if err != nil {
 		return err
 	}
@@ -265,7 +276,7 @@ func (s *Service) DeleteInvestmentTransactionByTransactionId(ctx context.Context
 		return err
 	}
 
-	investment, err = s.Repository.GetInvestmentById(ctx, *tx.InvestmentId, userID)
+	investment, err = s.Repository.GetInvestmentByID(ctx, *tx.InvestmentId, userID)
 	if err != nil {
 		return err
 	}
@@ -290,7 +301,7 @@ func (s *Service) DeleteInvestmentTransactionByTransactionId(ctx context.Context
 }
 
 func (s *Service) UpdateInvestment(ctx context.Context, investmentID, userID ulid.ULID, req domaincontracts.UpdateInvestmentRequest) error {
-	investment, err := s.Repository.GetInvestmentById(ctx, investmentID, userID)
+	investment, err := s.Repository.GetInvestmentByID(ctx, investmentID, userID)
 	if err != nil {
 		return err
 	}

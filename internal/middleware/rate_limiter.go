@@ -91,7 +91,7 @@ func RateLimit(limiter *RateLimiter) gin.HandlerFunc {
 }
 
 func RateLimitByUser() gin.HandlerFunc {
-	limiter := NewRateLimiter(100, time.Minute)
+	limiter := NewRateLimiter(1000, time.Minute)
 
 	return func(c *gin.Context) {
 		userID, exists := c.Get("user_id")

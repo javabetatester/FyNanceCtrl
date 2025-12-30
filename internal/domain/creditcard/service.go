@@ -155,7 +155,7 @@ func (s *Service) DeleteCreditCard(ctx context.Context, cardID, userID ulid.ULID
 		return appErrors.NewValidationError("credit_card", "Cartão possui fatura em aberto, não pode remover")
 	}
 
-	creditCardAccount, err := s.AccountService.Repository.GetByCreditCardId(ctx, cardID, userID)
+	creditCardAccount, err := s.AccountService.Repository.GetByCreditCardID(ctx, cardID, userID)
 	if err == nil && creditCardAccount != nil {
 		if err := s.AccountService.Repository.Delete(ctx, creditCardAccount.Id, userID); err != nil {
 			return appErrors.NewDatabaseError(fmt.Errorf("erro ao remover conta do cartao: %w", err))

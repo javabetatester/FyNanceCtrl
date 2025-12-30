@@ -6,7 +6,6 @@ import (
 
 	"Fynance/internal/domain/transaction"
 	"Fynance/internal/pkg"
-	"Fynance/internal/pkg/query"
 
 	"github.com/oklog/ulid/v2"
 	"gorm.io/gorm"
@@ -153,24 +152,6 @@ func (r *TransactionRepository) GetByIDAndUser(ctx context.Context, transactionI
 	return toDomainTransaction(&tdb)
 }
 
-func (r *TransactionRepository) FindByUser(ctx context.Context, userID ulid.ULID) *query.Query[transactionDB] {
-	return query.New[transactionDB](r.DB, "transactions").
-		Context(ctx).
-		Where("user_id = ?", userID.String()).
-		Order("date DESC, created_at DESC")
-}
-
-func (r *TransactionRepository) FindByUserAndAccount(ctx context.Context, userID, accountID ulid.ULID) *query.Query[transactionDB] {
-	return query.New[transactionDB](r.DB, "transactions").
-		Context(ctx).
-		Where("user_id = ? AND account_id = ?", userID.String(), accountID.String()).
-		Order("date DESC, created_at DESC")
-}
-
-func (r *TransactionRepository) Converter() func(*transactionDB) (*transaction.Transaction, error) {
-	return toDomainTransaction
-}
-
 func (r *TransactionRepository) GetAll(ctx context.Context, userID ulid.ULID, accountID *ulid.ULID, filters *transaction.TransactionFilters, pagination *pkg.PaginationParams) ([]*transaction.Transaction, int64, error) {
 	countQuery := r.DB.WithContext(ctx).Table("transactions t").Where("t.user_id = ?", userID.String())
 	dataQuery := r.DB.WithContext(ctx).Table("transactions t").
@@ -284,7 +265,7 @@ func (r *TransactionRepository) GetByCategory(ctx context.Context, categoryID ul
 	return out, total, nil
 }
 
-func (r *TransactionRepository) GetByInvestmentId(ctx context.Context, investmentID ulid.ULID, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*transaction.Transaction, int64, error) {
+func (r *TransactionRepository) GetByInvestmentID(ctx context.Context, investmentID ulid.ULID, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*transaction.Transaction, int64, error) {
 	countQuery := r.DB.WithContext(ctx).Table("transactions t").Where("t.investment_id = ? AND t.user_id = ?", investmentID.String(), userID.String())
 	dataQuery := r.DB.WithContext(ctx).Table("transactions t").
 		Select("t.*, c.name as category_name").

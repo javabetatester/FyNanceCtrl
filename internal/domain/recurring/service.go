@@ -30,20 +30,18 @@ func NewService(
 	repo Repository,
 	transactionRepo transaction.Repository,
 	categoryService *category.Service,
+	transactionService TransactionCreator,
 	userChecker *shared.UserCheckerService,
 ) *Service {
 	return &Service{
-		Repository:      repo,
-		TransactionRepo: transactionRepo,
-		CategoryService: categoryService,
+		Repository:         repo,
+		TransactionRepo:    transactionRepo,
+		CategoryService:    categoryService,
+		TransactionService: transactionService,
 		BaseService: shared.BaseService{
 			UserChecker: userChecker,
 		},
 	}
-}
-
-func (s *Service) SetTransactionService(transactionService TransactionCreator) {
-	s.TransactionService = transactionService
 }
 
 func (s *Service) CreateRecurring(ctx context.Context, req *CreateRecurringRequest) (*RecurringTransaction, error) {
@@ -128,7 +126,7 @@ func (s *Service) DeleteRecurring(ctx context.Context, recurringID, userID ulid.
 }
 
 func (s *Service) GetRecurringByID(ctx context.Context, recurringID, userID ulid.ULID) (*RecurringTransaction, error) {
-	recurring, err := s.Repository.GetById(ctx, recurringID, userID)
+	recurring, err := s.Repository.GetByID(ctx, recurringID, userID)
 	if err != nil {
 		return nil, appErrors.ErrNotFound.WithError(err)
 	}
@@ -145,7 +143,7 @@ func (s *Service) ListRecurring(ctx context.Context, userID ulid.ULID, paginatio
 		return nil, 0, err
 	}
 
-	return s.Repository.GetByUserId(ctx, userID, pagination)
+	return s.Repository.GetByUserID(ctx, userID, pagination)
 }
 
 func (s *Service) ProcessDueTransactions(ctx context.Context) error {

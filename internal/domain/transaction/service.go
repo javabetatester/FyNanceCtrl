@@ -43,28 +43,22 @@ func NewService(
 	repo Repository,
 	categoryService *category.Service,
 	accountService *account.Service,
+	budgetService BudgetUpdater,
+	goalService GoalContributionHandler,
+	investmentService InvestmentTransactionHandler,
 	userChecker *shared.UserCheckerService,
 ) *Service {
 	return &Service{
-		Repository:      repo,
-		CategoryService: categoryService,
-		AccountService:  accountService,
+		Repository:        repo,
+		CategoryService:   categoryService,
+		AccountService:    accountService,
+		BudgetService:     budgetService,
+		GoalService:       goalService,
+		InvestmentService: investmentService,
 		BaseService: shared.BaseService{
 			UserChecker: userChecker,
 		},
 	}
-}
-
-func (s *Service) SetBudgetService(budgetService BudgetUpdater) {
-	s.BudgetService = budgetService
-}
-
-func (s *Service) SetGoalService(goalService GoalContributionHandler) {
-	s.GoalService = goalService
-}
-
-func (s *Service) SetInvestmentService(investmentService InvestmentTransactionHandler) {
-	s.InvestmentService = investmentService
 }
 
 func (s *Service) CreateTransaction(ctx context.Context, transaction *Transaction) error {
@@ -191,12 +185,24 @@ func (s *Service) DeleteTransaction(ctx context.Context, transactionID ulid.ULID
 	s.revertBudgetIfExpense(ctx, transactionEntity)
 
 	if transactionEntity.Type == Goals && s.GoalService != nil {
-		_ = s.GoalService.DeleteContributionByTransactionId(ctx, transactionID, userID)
+		if err := s.GoalService.DeleteContributionByTransactionId(ctx, transactionID, userID); err != nil {
+			logger.Warn().
+				Err(err).
+				Str("transaction_id", transactionID.String()).
+				Str("user_id", userID.String()).
+				Msg("failed to delete goal contribution by transaction id")
+		}
 	}
 
 	if (transactionEntity.Type == Investment || transactionEntity.Type == Withdraw) &&
 		transactionEntity.InvestmentId != nil && s.InvestmentService != nil {
-		_ = s.InvestmentService.DeleteInvestmentTransactionByTransactionId(ctx, transactionID, userID)
+		if err := s.InvestmentService.DeleteInvestmentTransactionByTransactionId(ctx, transactionID, userID); err != nil {
+			logger.Warn().
+				Err(err).
+				Str("transaction_id", transactionID.String()).
+				Str("user_id", userID.String()).
+				Msg("failed to delete investment transaction by transaction id")
+		}
 	}
 
 	return s.Repository.Delete(ctx, transactionID)
@@ -467,7 +473,14 @@ func (s *Service) revertBudgetIfExpense(ctx context.Context, transaction *Transa
 		spentAmount = -spentAmount
 	}
 
-	_ = s.BudgetService.UpdateSpentWithDate(ctx, *transaction.CategoryId, transaction.UserId, -spentAmount, transaction.Date)
+	if err := s.BudgetService.UpdateSpentWithDate(ctx, *transaction.CategoryId, transaction.UserId, -spentAmount, transaction.Date); err != nil {
+		logger.Warn().
+			Err(err).
+			Str("category_id", transaction.CategoryId.String()).
+			Str("user_id", transaction.UserId.String()).
+			Float64("amount", -spentAmount).
+			Msg("failed to revert budget spent")
+	}
 }
 
 func (s *Service) updateBudgetOnChange(ctx context.Context, userID ulid.ULID, oldCategoryId *ulid.ULID, oldDate time.Time, oldType Types, oldAmount float64, newTx *Transaction) {
@@ -480,7 +493,14 @@ func (s *Service) updateBudgetOnChange(ctx context.Context, userID ulid.ULID, ol
 		if oldSpentAmount < 0 {
 			oldSpentAmount = -oldSpentAmount
 		}
-		_ = s.BudgetService.UpdateSpentWithDate(ctx, *oldCategoryId, userID, -oldSpentAmount, oldDate)
+		if err := s.BudgetService.UpdateSpentWithDate(ctx, *oldCategoryId, userID, -oldSpentAmount, oldDate); err != nil {
+			logger.Warn().
+				Err(err).
+				Str("category_id", oldCategoryId.String()).
+				Str("user_id", userID.String()).
+				Float64("amount", -oldSpentAmount).
+				Msg("failed to revert old budget spent on transaction update")
+		}
 	}
 
 	if newTx.Type == Expense && newTx.CategoryId != nil {
@@ -492,7 +512,14 @@ func (s *Service) updateBudgetOnChange(ctx context.Context, userID ulid.ULID, ol
 		if transactionDate.IsZero() {
 			transactionDate = time.Now()
 		}
-		_ = s.BudgetService.UpdateSpentWithDate(ctx, *newTx.CategoryId, userID, newSpentAmount, transactionDate)
+		if err := s.BudgetService.UpdateSpentWithDate(ctx, *newTx.CategoryId, userID, newSpentAmount, transactionDate); err != nil {
+			logger.Warn().
+				Err(err).
+				Str("category_id", newTx.CategoryId.String()).
+				Str("user_id", userID.String()).
+				Float64("amount", newSpentAmount).
+				Msg("failed to update new budget spent on transaction update")
+		}
 	}
 }
 

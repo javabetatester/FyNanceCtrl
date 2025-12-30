@@ -93,7 +93,7 @@ func (r *UserRepository) Delete(ctx context.Context, id ulid.ULID) error {
 	return nil
 }
 
-func (r *UserRepository) GetById(ctx context.Context, id ulid.ULID) (*user.User, error) {
+func (r *UserRepository) GetByID(ctx context.Context, id ulid.ULID) (*user.User, error) {
 	var udb userDB
 	if err := r.DB.WithContext(ctx).Table("users").Where("id = ?", id.String()).First(&udb).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

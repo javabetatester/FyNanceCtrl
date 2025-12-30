@@ -105,7 +105,7 @@ func (r *BudgetRepository) Delete(ctx context.Context, budgetID, userID ulid.ULI
 	return nil
 }
 
-func (r *BudgetRepository) GetById(ctx context.Context, budgetID, userID ulid.ULID) (*budget.Budget, error) {
+func (r *BudgetRepository) GetByID(ctx context.Context, budgetID, userID ulid.ULID) (*budget.Budget, error) {
 	type budgetDBWithCategory struct {
 		budgetDB
 		CategoryName string `gorm:"->;column:category_name"`
@@ -134,7 +134,7 @@ func (r *BudgetRepository) GetById(ctx context.Context, budgetID, userID ulid.UL
 	return b, nil
 }
 
-func (r *BudgetRepository) GetByUserId(ctx context.Context, userID ulid.ULID, month, year int, filters *budget.BudgetFilters, pagination *pkg.PaginationParams) ([]*budget.Budget, int64, error) {
+func (r *BudgetRepository) GetByUserID(ctx context.Context, userID ulid.ULID, month, year int, filters *budget.BudgetFilters, pagination *pkg.PaginationParams) ([]*budget.Budget, int64, error) {
 	if pagination == nil {
 		pagination = &pkg.PaginationParams{Page: 1, Limit: 10}
 	}
@@ -225,7 +225,7 @@ func (r *BudgetRepository) GetByUserId(ctx context.Context, userID ulid.ULID, mo
 	return budgets, total, nil
 }
 
-func (r *BudgetRepository) GetByCategoryId(ctx context.Context, categoryID, userID ulid.ULID, month, year int) (*budget.Budget, error) {
+func (r *BudgetRepository) GetByCategoryID(ctx context.Context, categoryID, userID ulid.ULID, month, year int) (*budget.Budget, error) {
 	var bdb budgetDB
 	err := r.DB.WithContext(ctx).
 		Table("budgets").

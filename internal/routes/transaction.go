@@ -63,7 +63,7 @@ func (h *Handler) CreateTransaction(c *gin.Context) {
 		}
 
 		transactionDate := *body.Date
-		transactionDate = time.Date(transactionDate.Year(), transactionDate.Month(), transactionDate.Day(), 0, 0, 0, 0, transactionDate.Location())
+		transactionDate = time.Date(transactionDate.Year(), transactionDate.Month(), transactionDate.Day(), 0, 0, 0, 0, time.UTC)
 
 		req := &creditcard.CreateTransactionRequest{
 			CreditCardId: *accountEntity.CreditCardId,
@@ -118,7 +118,7 @@ func (h *Handler) CreateTransaction(c *gin.Context) {
 	}
 
 	transactionDate := *body.Date
-	transactionDate = time.Date(transactionDate.Year(), transactionDate.Month(), transactionDate.Day(), 0, 0, 0, 0, transactionDate.Location())
+	transactionDate = time.Date(transactionDate.Year(), transactionDate.Month(), transactionDate.Day(), 0, 0, 0, 0, time.UTC)
 
 	transactionAmount := body.Amount
 	if transaction.Types(body.Type) == transaction.Expense && transactionAmount > 0 {
@@ -292,7 +292,7 @@ func (h *Handler) UpdateTransaction(c *gin.Context) {
 	transactionDate := storedTransaction.Date
 	if body.Date != nil {
 		transactionDate = *body.Date
-		transactionDate = time.Date(transactionDate.Year(), transactionDate.Month(), transactionDate.Day(), 0, 0, 0, 0, transactionDate.Location())
+		transactionDate = time.Date(transactionDate.Year(), transactionDate.Month(), transactionDate.Day(), 0, 0, 0, 0, time.UTC)
 	}
 
 	transactionAmount := body.Amount

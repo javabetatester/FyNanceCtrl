@@ -28,7 +28,7 @@ type Repository interface {
 	GetByAmount(ctx context.Context, amount float64, pagination *pkg.PaginationParams) ([]*Transaction, int64, error)
 	GetByName(ctx context.Context, name string, pagination *pkg.PaginationParams) ([]*Transaction, int64, error)
 	GetByCategory(ctx context.Context, categoryID ulid.ULID, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*Transaction, int64, error)
-	GetByInvestmentId(ctx context.Context, investmentID ulid.ULID, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*Transaction, int64, error)
+	GetByInvestmentID(ctx context.Context, investmentID ulid.ULID, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*Transaction, int64, error)
 	GetNumberOfTransactions(ctx context.Context, userID ulid.ULID) (int64, error)
 }
 

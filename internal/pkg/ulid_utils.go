@@ -50,3 +50,22 @@ func SetTimestamps() time.Time {
 func ParseInt(s string) (int, error) {
 	return strconv.Atoi(s)
 }
+
+
+func MustParseULIDOrEmpty(ulidStr string) (ulid.ULID, error) {
+	if ulidStr == "" {
+		return ulid.ULID{}, nil
+	}
+	return ParseULID(ulidStr)
+}
+
+func MustParseULIDPtr(ulidStr *string) (*ulid.ULID, error) {
+	if ulidStr == nil || *ulidStr == "" {
+		return nil, nil
+	}
+	parsed, err := ParseULID(*ulidStr)
+	if err != nil {
+		return nil, err
+	}
+	return &parsed, nil
+}
