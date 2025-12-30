@@ -27,7 +27,7 @@ func (h *Handler) CreateRecurring(c *gin.Context) {
 
 	categoryID, err := pkg.ParseULID(body.CategoryId)
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("category_id", "formato invalido"))
+		h.respondError(c, appErrors.NewValidationError("category_id", "formato inválido"))
 		return
 	}
 
@@ -47,7 +47,7 @@ func (h *Handler) CreateRecurring(c *gin.Context) {
 	if body.AccountId != "" {
 		accountID, err := pkg.ParseULID(body.AccountId)
 		if err != nil {
-			h.respondError(c, appErrors.NewValidationError("account_id", "formato invalido"))
+			h.respondError(c, appErrors.NewValidationError("account_id", "formato inválido"))
 			return
 		}
 		req.AccountId = &accountID
@@ -93,7 +93,7 @@ func (h *Handler) ListRecurrings(c *gin.Context) {
 func (h *Handler) GetRecurring(c *gin.Context) {
 	recurringID, err := pkg.ParseULID(c.Param("id"))
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("id", "formato invalido"))
+		h.respondError(c, appErrors.NewValidationError("id", "formato inválido"))
 		return
 	}
 
@@ -116,7 +116,7 @@ func (h *Handler) GetRecurring(c *gin.Context) {
 func (h *Handler) UpdateRecurring(c *gin.Context) {
 	recurringID, err := pkg.ParseULID(c.Param("id"))
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("id", "formato invalido"))
+		h.respondError(c, appErrors.NewValidationError("id", "formato inválido"))
 		return
 	}
 
@@ -137,6 +137,7 @@ func (h *Handler) UpdateRecurring(c *gin.Context) {
 		Description: body.Description,
 		IsActive:    body.IsActive,
 		EndDate:     body.EndDate,
+		NextDue:     body.NextDue,
 	}
 
 	ctx := c.Request.Context()
@@ -151,7 +152,7 @@ func (h *Handler) UpdateRecurring(c *gin.Context) {
 func (h *Handler) DeleteRecurring(c *gin.Context) {
 	recurringID, err := pkg.ParseULID(c.Param("id"))
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("id", "formato invalido"))
+		h.respondError(c, appErrors.NewValidationError("id", "formato inválido"))
 		return
 	}
 
@@ -173,7 +174,7 @@ func (h *Handler) DeleteRecurring(c *gin.Context) {
 func (h *Handler) PauseRecurring(c *gin.Context) {
 	recurringID, err := pkg.ParseULID(c.Param("id"))
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("id", "formato invalido"))
+		h.respondError(c, appErrors.NewValidationError("id", "formato inválido"))
 		return
 	}
 
@@ -200,7 +201,7 @@ func (h *Handler) PauseRecurring(c *gin.Context) {
 func (h *Handler) ResumeRecurring(c *gin.Context) {
 	recurringID, err := pkg.ParseULID(c.Param("id"))
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("id", "formato invalido"))
+		h.respondError(c, appErrors.NewValidationError("id", "formato inválido"))
 		return
 	}
 
@@ -227,7 +228,7 @@ func (h *Handler) ResumeRecurring(c *gin.Context) {
 func (h *Handler) ProcessRecurring(c *gin.Context) {
 	recurringID, err := pkg.ParseULID(c.Param("id"))
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("id", "formato invalido"))
+		h.respondError(c, appErrors.NewValidationError("id", "formato inválido"))
 		return
 	}
 
@@ -238,9 +239,11 @@ func (h *Handler) ProcessRecurring(c *gin.Context) {
 	}
 
 	var body contracts.RecurringProcessRequest
-	if err := c.ShouldBindJSON(&body); err != nil {
-		h.respondError(c, appErrors.ErrBadRequest.WithError(err))
-		return
+	if c.Request.ContentLength > 0 {
+		if err := c.ShouldBindJSON(&body); err != nil {
+			h.respondError(c, appErrors.ErrBadRequest.WithError(err))
+			return
+		}
 	}
 
 	ctx := c.Request.Context()

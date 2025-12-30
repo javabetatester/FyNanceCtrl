@@ -7,6 +7,7 @@ import (
 	"Fynance/internal/domain/auth"
 	"Fynance/internal/domain/user"
 	appErrors "Fynance/internal/errors"
+	"Fynance/internal/logger"
 
 	"github.com/gin-gonic/gin"
 )
@@ -28,6 +29,10 @@ func (h *Handler) Authenticate(c *gin.Context) {
 	if err != nil {
 		h.respondError(c, err)
 		return
+	}
+
+	if err := h.TransactionService.CreateDefaultCategories(ctx, userEntity.Id); err != nil {
+		logger.Warn().Err(err).Msg("Falha ao criar categorias padrão no login")
 	}
 
 	token, err := h.JwtService.GenerateToken(ctx, userEntity.Id)
@@ -53,6 +58,7 @@ func (h *Handler) Registration(c *gin.Context) {
 	userEntity := user.User{
 		Name:     body.Name,
 		Email:    body.Email,
+		Phone:    body.Phone,
 		Password: body.Password,
 	}
 
@@ -63,4 +69,35 @@ func (h *Handler) Registration(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, contracts.MessageResponse{Message: "Usuário registrado com sucesso"})
+}
+
+func (h *Handler) GoogleAuth(c *gin.Context) {
+	var body contracts.GoogleAuthRequest
+	if err := c.ShouldBindJSON(&body); err != nil {
+		h.respondError(c, appErrors.ParseValidationErrors(err))
+		return
+	}
+
+	ctx := c.Request.Context()
+	userEntity, err := h.AuthService.GoogleLogin(ctx, body.Credential)
+	if err != nil {
+		h.respondError(c, err)
+		return
+	}
+
+	if err := h.TransactionService.CreateDefaultCategories(ctx, userEntity.Id); err != nil {
+		logger.Warn().Err(err).Msg("Falha ao criar categorias padrão no login Google")
+	}
+
+	token, err := h.JwtService.GenerateToken(ctx, userEntity.Id)
+	if err != nil {
+		h.respondError(c, appErrors.ErrInternalServer.WithError(err))
+		return
+	}
+
+	c.JSON(http.StatusOK, contracts.GoogleAuthResponse{
+		Message: "Login com Google realizado com sucesso",
+		User:    userEntity.Name,
+		Token:   token,
+	})
 }

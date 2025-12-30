@@ -13,9 +13,11 @@ import (
 	"Fynance/internal/domain/transaction"
 	"Fynance/internal/domain/user"
 	appErrors "Fynance/internal/errors"
+	"Fynance/internal/infrastructure"
 	"Fynance/internal/logger"
 	"Fynance/internal/middleware"
 	"Fynance/internal/pkg"
+	"Fynance/internal/pkg/query"
 
 	"github.com/gin-gonic/gin"
 	"github.com/oklog/ulid/v2"
@@ -34,6 +36,15 @@ type Handler struct {
 	RecurringService   recurring.Service
 	ReportService      report.Service
 	CreditCardService  creditcard.Service
+
+	AccountRepository     *infrastructure.AccountRepository
+	TransactionRepository *infrastructure.TransactionRepository
+	GoalRepository        *infrastructure.GoalRepository
+	BudgetRepository      *infrastructure.BudgetRepository
+	InvestmentRepository  *infrastructure.InvestmentRepository
+	RecurringRepository   *infrastructure.RecurringRepository
+	CreditCardRepository  *infrastructure.CreditCardRepository
+	CategoryRepository    *infrastructure.TransactionCategoryRepository
 }
 
 func (h *Handler) GetUserIDFromContext(c *gin.Context) (ulid.ULID, error) {
@@ -48,6 +59,10 @@ func (h *Handler) GetUserIDFromContext(c *gin.Context) (ulid.ULID, error) {
 	}
 
 	return userID, nil
+}
+
+func (h *Handler) parsePage(c *gin.Context) query.Page {
+	return query.ParsePageFromGin(c)
 }
 
 func (h *Handler) parsePagination(c *gin.Context) *pkg.PaginationParams {
@@ -84,7 +99,7 @@ func (h *Handler) respondError(c *gin.Context, err error) {
 		"error":   appErr.Code,
 		"message": appErr.Message,
 	}
-	if len(appErr.Details) > 0 {
+	if len(appErr.Details) > 0 && appErr.Code != "VALIDATION_ERROR" {
 		payload["details"] = appErr.Details
 	}
 	c.JSON(appErr.StatusCode, payload)

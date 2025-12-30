@@ -3,6 +3,7 @@ package routes
 import (
 	"Fynance/internal/contracts"
 	domaincontracts "Fynance/internal/domain/contracts"
+	"Fynance/internal/domain/goal"
 	appErrors "Fynance/internal/errors"
 	"Fynance/internal/pkg"
 	"net/http"
@@ -88,10 +89,17 @@ func (h *Handler) ListGoals(c *gin.Context) {
 		return
 	}
 
+	var filters *goal.GoalFilters
+	statusStr := c.Query("status")
+	if statusStr != "" && statusStr != "ALL" {
+		status := goal.GoalStatus(statusStr)
+		filters = &goal.GoalFilters{Status: &status}
+	}
+
 	pagination := h.parsePagination(c)
 
 	ctx := c.Request.Context()
-	goals, total, err := h.GoalService.GetGoalsByUserID(ctx, userID, pagination)
+	goals, total, err := h.GoalService.GetGoalsByUserID(ctx, userID, filters, pagination)
 	if err != nil {
 		h.respondError(c, err)
 		return
@@ -139,7 +147,7 @@ func (h *Handler) DeleteGoal(c *gin.Context) {
 
 	goalID, err := pkg.ParseULID(id)
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("id", "formato invalido"))
+		h.respondError(c, appErrors.NewValidationError("id", "formato inválido"))
 		return
 	}
 
@@ -173,7 +181,7 @@ func (h *Handler) ContributeToGoal(c *gin.Context) {
 
 	goalID, err := pkg.ParseULID(id)
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("id", "formato invalido"))
+		h.respondError(c, appErrors.NewValidationError("id", "formato inválido"))
 		return
 	}
 
@@ -185,7 +193,7 @@ func (h *Handler) ContributeToGoal(c *gin.Context) {
 
 	accountID, err := pkg.ParseULID(body.AccountID)
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("account_id", "formato invalido"))
+		h.respondError(c, appErrors.NewValidationError("account_id", "formato inválido"))
 		return
 	}
 
@@ -213,7 +221,7 @@ func (h *Handler) WithdrawFromGoal(c *gin.Context) {
 
 	goalID, err := pkg.ParseULID(id)
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("id", "formato invalido"))
+		h.respondError(c, appErrors.NewValidationError("id", "formato inválido"))
 		return
 	}
 
@@ -225,7 +233,7 @@ func (h *Handler) WithdrawFromGoal(c *gin.Context) {
 
 	accountID, err := pkg.ParseULID(body.AccountID)
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("account_id", "formato invalido"))
+		h.respondError(c, appErrors.NewValidationError("account_id", "formato inválido"))
 		return
 	}
 
@@ -247,7 +255,7 @@ func (h *Handler) GetGoalContributions(c *gin.Context) {
 
 	goalID, err := pkg.ParseULID(id)
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("id", "formato invalido"))
+		h.respondError(c, appErrors.NewValidationError("id", "formato inválido"))
 		return
 	}
 
@@ -276,7 +284,7 @@ func (h *Handler) GetGoalProgress(c *gin.Context) {
 
 	goalID, err := pkg.ParseULID(id)
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("id", "formato invalido"))
+		h.respondError(c, appErrors.NewValidationError("id", "formato inválido"))
 		return
 	}
 
@@ -294,4 +302,32 @@ func (h *Handler) GetGoalProgress(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, contracts.GoalProgressResponse{Progress: progress})
+}
+
+func (h *Handler) DeleteContribution(c *gin.Context) {
+	id := c.Param("contribution_id")
+	if id == "" {
+		h.respondError(c, appErrors.NewValidationError("contribution_id", "é obrigatório"))
+		return
+	}
+
+	contributionID, err := pkg.ParseULID(id)
+	if err != nil {
+		h.respondError(c, appErrors.NewValidationError("contribution_id", "formato inválido"))
+		return
+	}
+
+	userID, err := h.GetUserIDFromContext(c)
+	if err != nil {
+		h.respondError(c, err)
+		return
+	}
+
+	ctx := c.Request.Context()
+	if err := h.GoalService.DeleteContribution(ctx, contributionID, userID); err != nil {
+		h.respondError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, contracts.MessageResponse{Message: "Contribuição removida com sucesso"})
 }

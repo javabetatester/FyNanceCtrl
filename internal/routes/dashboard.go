@@ -50,7 +50,7 @@ func (h *Handler) GetDashboard(c *gin.Context) {
 	if accountIDStr != "" {
 		parsed, err := pkg.ParseULID(accountIDStr)
 		if err != nil {
-			h.respondError(c, appErrors.NewValidationError("account_id", "formato invalido"))
+			h.respondError(c, appErrors.NewValidationError("account_id", "formato inválido"))
 			return
 		}
 		accountID = &parsed

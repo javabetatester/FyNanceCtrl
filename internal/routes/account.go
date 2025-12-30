@@ -7,6 +7,7 @@ import (
 	"Fynance/internal/domain/account"
 	appErrors "Fynance/internal/errors"
 	"Fynance/internal/pkg"
+	"Fynance/internal/pkg/query"
 
 	"github.com/gin-gonic/gin"
 )
@@ -59,23 +60,34 @@ func (h *Handler) ListAccounts(c *gin.Context) {
 		return
 	}
 
-	pagination := h.parsePagination(c)
-
 	ctx := c.Request.Context()
-	accounts, total, err := h.AccountService.ListAccounts(ctx, userID, pagination)
+
+	page := h.parsePage(c)
+	q := h.AccountRepository.FindByUser(ctx, userID)
+
+	typeStr := c.Query("type")
+	if typeStr != "" && typeStr != "ALL" {
+		q = q.Where("type = ?", typeStr)
+	}
+
+	searchStr := c.Query("search")
+	if searchStr != "" {
+		q = q.Where("name ILIKE ?", "%"+searchStr+"%")
+	}
+
+	result, err := query.Execute(q, page, h.AccountRepository.Converter())
 	if err != nil {
-		h.respondError(c, err)
+		h.respondError(c, appErrors.NewDatabaseError(err))
 		return
 	}
 
-	response := pkg.NewPaginatedResponse(accounts, pagination.Page, pagination.Limit, total)
-	c.JSON(http.StatusOK, response)
+	c.JSON(http.StatusOK, result)
 }
 
 func (h *Handler) GetAccount(c *gin.Context) {
 	accountID, err := pkg.ParseULID(c.Param("id"))
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("id", "formato invalido"))
+		h.respondError(c, appErrors.NewValidationError("id", "formato inválido"))
 		return
 	}
 
@@ -98,7 +110,7 @@ func (h *Handler) GetAccount(c *gin.Context) {
 func (h *Handler) UpdateAccount(c *gin.Context) {
 	accountID, err := pkg.ParseULID(c.Param("id"))
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("id", "formato invalido"))
+		h.respondError(c, appErrors.NewValidationError("id", "formato inválido"))
 		return
 	}
 
@@ -139,7 +151,7 @@ func (h *Handler) UpdateAccount(c *gin.Context) {
 func (h *Handler) DeleteAccount(c *gin.Context) {
 	accountID, err := pkg.ParseULID(c.Param("id"))
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("id", "formato invalido"))
+		h.respondError(c, appErrors.NewValidationError("id", "formato inválido"))
 		return
 	}
 
@@ -173,13 +185,13 @@ func (h *Handler) TransferBetweenAccounts(c *gin.Context) {
 
 	fromAccountID, err := pkg.ParseULID(body.FromAccountId)
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("from_account_id", "formato invalido"))
+		h.respondError(c, appErrors.NewValidationError("from_account_id", "formato inválido"))
 		return
 	}
 
 	toAccountID, err := pkg.ParseULID(body.ToAccountId)
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("to_account_id", "formato invalido"))
+		h.respondError(c, appErrors.NewValidationError("to_account_id", "formato inválido"))
 		return
 	}
 

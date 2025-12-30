@@ -5,10 +5,12 @@ import (
 
 	"Fynance/internal/contracts"
 	domaincontracts "Fynance/internal/domain/contracts"
+	"Fynance/internal/domain/investment"
 	appErrors "Fynance/internal/errors"
 	"Fynance/internal/pkg"
 
 	"github.com/gin-gonic/gin"
+	"github.com/oklog/ulid/v2"
 )
 
 func (h *Handler) CreateInvestment(c *gin.Context) {
@@ -26,13 +28,14 @@ func (h *Handler) CreateInvestment(c *gin.Context) {
 
 	accountID, err := pkg.ParseULID(body.AccountID)
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("account_id", "formato invalido"))
+		h.respondError(c, appErrors.NewValidationError("account_id", "formato inv?lido"))
 		return
 	}
 
 	req := domaincontracts.CreateInvestmentRequest{
 		UserId:        userID,
 		AccountId:     accountID,
+		CategoryId:    ulid.ULID{},
 		Type:          body.Type,
 		Name:          body.Name,
 		InitialAmount: body.InitialAmount,
@@ -59,10 +62,16 @@ func (h *Handler) ListInvestments(c *gin.Context) {
 		return
 	}
 
+	var filters *investment.InvestmentFilters
+	typeStr := c.Query("type")
+	if typeStr != "" && typeStr != "ALL" {
+		filters = &investment.InvestmentFilters{Type: &typeStr}
+	}
+
 	pagination := h.parsePagination(c)
 
 	ctx := c.Request.Context()
-	investments, total, err := h.InvestmentService.ListInvestments(ctx, userID, pagination)
+	investments, total, err := h.InvestmentService.ListInvestments(ctx, userID, filters, pagination)
 	if err != nil {
 		h.respondError(c, err)
 		return
@@ -75,7 +84,7 @@ func (h *Handler) ListInvestments(c *gin.Context) {
 func (h *Handler) GetInvestment(c *gin.Context) {
 	investmentID, err := pkg.ParseULID(c.Param("id"))
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("id", "formato inválido"))
+		h.respondError(c, appErrors.NewValidationError("id", "formato inv?lido"))
 		return
 	}
 
@@ -98,7 +107,7 @@ func (h *Handler) GetInvestment(c *gin.Context) {
 func (h *Handler) MakeContribution(c *gin.Context) {
 	investmentID, err := pkg.ParseULID(c.Param("id"))
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("id", "formato inválido"))
+		h.respondError(c, appErrors.NewValidationError("id", "formato inv?lido"))
 		return
 	}
 
@@ -116,7 +125,7 @@ func (h *Handler) MakeContribution(c *gin.Context) {
 
 	accountID, err := pkg.ParseULID(body.AccountID)
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("account_id", "formato invalido"))
+		h.respondError(c, appErrors.NewValidationError("account_id", "formato inv?lido"))
 		return
 	}
 
@@ -132,7 +141,7 @@ func (h *Handler) MakeContribution(c *gin.Context) {
 func (h *Handler) MakeWithdraw(c *gin.Context) {
 	investmentID, err := pkg.ParseULID(c.Param("id"))
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("id", "formato inválido"))
+		h.respondError(c, appErrors.NewValidationError("id", "formato inv?lido"))
 		return
 	}
 
@@ -150,7 +159,7 @@ func (h *Handler) MakeWithdraw(c *gin.Context) {
 
 	accountID, err := pkg.ParseULID(body.AccountID)
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("account_id", "formato invalido"))
+		h.respondError(c, appErrors.NewValidationError("account_id", "formato inv?lido"))
 		return
 	}
 
@@ -166,7 +175,7 @@ func (h *Handler) MakeWithdraw(c *gin.Context) {
 func (h *Handler) GetInvestmentReturn(c *gin.Context) {
 	investmentID, err := pkg.ParseULID(c.Param("id"))
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("id", "formato inválido"))
+		h.respondError(c, appErrors.NewValidationError("id", "formato inv?lido"))
 		return
 	}
 
@@ -192,7 +201,7 @@ func (h *Handler) GetInvestmentReturn(c *gin.Context) {
 func (h *Handler) DeleteInvestment(c *gin.Context) {
 	investmentID, err := pkg.ParseULID(c.Param("id"))
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("id", "formato inválido"))
+		h.respondError(c, appErrors.NewValidationError("id", "formato inv?lido"))
 		return
 	}
 
@@ -208,13 +217,13 @@ func (h *Handler) DeleteInvestment(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, contracts.MessageResponse{Message: "Investimento excluído com sucesso"})
+	c.JSON(http.StatusOK, contracts.MessageResponse{Message: "Investimento exclu?do com sucesso"})
 }
 
 func (h *Handler) UpdateInvestment(c *gin.Context) {
 	investmentID, err := pkg.ParseULID(c.Param("id"))
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("id", "formato inválido"))
+		h.respondError(c, appErrors.NewValidationError("id", "formato inv?lido"))
 		return
 	}
 
@@ -241,8 +250,8 @@ func (h *Handler) UpdateInvestment(c *gin.Context) {
 	if body.Type != nil {
 		updateReq.Type = body.Type
 	}
-	if body.ReturnRate != nil {
-		updateReq.ReturnRate = body.ReturnRate
+	if body.CurrentBalance != nil {
+		updateReq.CurrentBalance = body.CurrentBalance
 	}
 
 	ctx := c.Request.Context()

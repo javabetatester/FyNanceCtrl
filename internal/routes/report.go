@@ -79,7 +79,7 @@ func (h *Handler) GetCategoryReport(c *gin.Context) {
 
 	categoryID, err := pkg.ParseULID(c.Param("category_id"))
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("category_id", "formato invalido"))
+		h.respondError(c, appErrors.NewValidationError("category_id", "formato inválido"))
 		return
 	}
 
@@ -147,13 +147,13 @@ func (h *Handler) GetPeriodReport(c *gin.Context) {
 
 	startDate, err := time.Parse("2006-01-02", startDateStr)
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("start_date", "formato invalido. Use YYYY-MM-DD"))
+		h.respondError(c, appErrors.NewValidationError("start_date", "formato inválido. Use YYYY-MM-DD"))
 		return
 	}
 
 	endDate, err := time.Parse("2006-01-02", endDateStr)
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("end_date", "formato invalido. Use YYYY-MM-DD"))
+		h.respondError(c, appErrors.NewValidationError("end_date", "formato inválido. Use YYYY-MM-DD"))
 		return
 	}
 

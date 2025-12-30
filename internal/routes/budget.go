@@ -28,7 +28,7 @@ func (h *Handler) CreateBudget(c *gin.Context) {
 
 	categoryID, err := pkg.ParseULID(body.CategoryId)
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("category_id", "formato invalido"))
+		h.respondError(c, appErrors.NewValidationError("category_id", "formato inválido"))
 		return
 	}
 
@@ -62,39 +62,67 @@ func (h *Handler) ListBudgets(c *gin.Context) {
 		return
 	}
 
-	now := time.Now()
-	month := int(now.Month())
-	year := now.Year()
-
+	var month, year int
 	if m := c.Query("month"); m != "" {
-		if parsed, err := strconv.Atoi(m); err == nil {
+		if parsed, err := strconv.Atoi(m); err == nil && parsed > 0 && parsed <= 12 {
 			month = parsed
 		}
 	}
 
 	if y := c.Query("year"); y != "" {
-		if parsed, err := strconv.Atoi(y); err == nil {
+		if parsed, err := strconv.Atoi(y); err == nil && parsed > 0 {
 			year = parsed
 		}
+	}
+
+	var filters *budget.BudgetFilters
+	searchStr := c.Query("search")
+	if searchStr != "" {
+		filters = &budget.BudgetFilters{Search: &searchStr}
 	}
 
 	pagination := h.parsePagination(c)
 
 	ctx := c.Request.Context()
-	budgets, total, err := h.BudgetService.ListBudgets(ctx, userID, month, year, pagination)
+	budgets, total, err := h.BudgetService.ListBudgets(ctx, userID, month, year, filters, pagination)
 	if err != nil {
 		h.respondError(c, err)
 		return
 	}
 
-	response := pkg.NewPaginatedResponse(budgets, pagination.Page, pagination.Limit, total)
+	budgetResponses := make([]*contracts.BudgetResponse, 0, len(budgets))
+	for _, b := range budgets {
+		remaining := b.Amount - b.Spent
+		percentage := 0.0
+		if b.Amount > 0 {
+			percentage = (b.Spent / b.Amount) * 100
+		}
+
+		status := "OK"
+		if percentage >= 100 {
+			status = "EXCEEDED"
+		} else if percentage >= b.AlertAt {
+			status = "WARNING"
+		}
+
+		budgetResponses = append(budgetResponses, &contracts.BudgetResponse{
+			Budget:       b,
+			Percentage:   percentage,
+			Remaining:    remaining,
+			SpentAmount:  b.Spent,
+			BudgetAmount: b.Amount,
+			Status:       status,
+		})
+	}
+
+	response := pkg.NewPaginatedResponse(budgetResponses, pagination.Page, pagination.Limit, total)
 	c.JSON(http.StatusOK, response)
 }
 
 func (h *Handler) GetBudget(c *gin.Context) {
 	budgetID, err := pkg.ParseULID(c.Param("id"))
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("id", "formato invalido"))
+		h.respondError(c, appErrors.NewValidationError("id", "formato inválido"))
 		return
 	}
 
@@ -117,7 +145,7 @@ func (h *Handler) GetBudget(c *gin.Context) {
 func (h *Handler) UpdateBudget(c *gin.Context) {
 	budgetID, err := pkg.ParseULID(c.Param("id"))
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("id", "formato invalido"))
+		h.respondError(c, appErrors.NewValidationError("id", "formato inválido"))
 		return
 	}
 
@@ -151,7 +179,7 @@ func (h *Handler) UpdateBudget(c *gin.Context) {
 func (h *Handler) DeleteBudget(c *gin.Context) {
 	budgetID, err := pkg.ParseULID(c.Param("id"))
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("id", "formato invalido"))
+		h.respondError(c, appErrors.NewValidationError("id", "formato inválido"))
 		return
 	}
 
@@ -206,7 +234,7 @@ func (h *Handler) GetBudgetSummary(c *gin.Context) {
 func (h *Handler) GetBudgetStatus(c *gin.Context) {
 	budgetID, err := pkg.ParseULID(c.Param("id"))
 	if err != nil {
-		h.respondError(c, appErrors.NewValidationError("id", "formato invalido"))
+		h.respondError(c, appErrors.NewValidationError("id", "formato inválido"))
 		return
 	}
 
