@@ -11,6 +11,7 @@ type RecurringTransaction struct {
 	UserId        ulid.ULID     `gorm:"type:varchar(26);index:idx_recurring_user_id;not null" json:"userId"`
 	Type          string        `gorm:"type:varchar(15);not null" json:"type"`
 	CategoryId    ulid.ULID     `gorm:"type:varchar(26);index:idx_recurring_category_id" json:"categoryId"`
+	CategoryName  string        `gorm:"-" json:"categoryName,omitempty"`
 	AccountId     *ulid.ULID    `gorm:"type:varchar(26);index:idx_recurring_account_id" json:"accountId"`
 	Amount        float64       `gorm:"type:decimal(15,2);not null" json:"amount"`
 	Description   string        `gorm:"type:varchar(255)" json:"description"`

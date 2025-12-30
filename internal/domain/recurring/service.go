@@ -5,23 +5,49 @@ import (
 	"strings"
 	"time"
 
+	"Fynance/internal/domain/category"
+	"Fynance/internal/domain/shared"
 	"Fynance/internal/domain/transaction"
-	"Fynance/internal/domain/user"
 	appErrors "Fynance/internal/errors"
 	"Fynance/internal/pkg"
 
 	"github.com/oklog/ulid/v2"
 )
 
+type TransactionCreator interface {
+	CreateTransaction(ctx context.Context, transaction *transaction.Transaction) error
+}
+
 type Service struct {
 	Repository         Repository
 	TransactionRepo    transaction.Repository
-	CategoryRepository transaction.CategoryRepository
-	UserService        *user.Service
+	CategoryService    *category.Service
+	TransactionService TransactionCreator
+	shared.BaseService
+}
+
+func NewService(
+	repo Repository,
+	transactionRepo transaction.Repository,
+	categoryService *category.Service,
+	userChecker *shared.UserCheckerService,
+) *Service {
+	return &Service{
+		Repository:      repo,
+		TransactionRepo: transactionRepo,
+		CategoryService: categoryService,
+		BaseService: shared.BaseService{
+			UserChecker: userChecker,
+		},
+	}
+}
+
+func (s *Service) SetTransactionService(transactionService TransactionCreator) {
+	s.TransactionService = transactionService
 }
 
 func (s *Service) CreateRecurring(ctx context.Context, req *CreateRecurringRequest) (*RecurringTransaction, error) {
-	if err := s.ensureUserExists(ctx, req.UserId); err != nil {
+	if err := s.EnsureUserExists(ctx, req.UserId); err != nil {
 		return nil, err
 	}
 
@@ -83,6 +109,10 @@ func (s *Service) UpdateRecurring(ctx context.Context, recurringID, userID ulid.
 		recurring.EndDate = req.EndDate
 	}
 
+	if req.NextDue != nil {
+		recurring.NextDue = *req.NextDue
+	}
+
 	recurring.UpdatedAt = time.Now()
 
 	return s.Repository.Update(ctx, recurring)
@@ -111,7 +141,7 @@ func (s *Service) GetRecurringByID(ctx context.Context, recurringID, userID ulid
 }
 
 func (s *Service) ListRecurring(ctx context.Context, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*RecurringTransaction, int64, error) {
-	if err := s.ensureUserExists(ctx, userID); err != nil {
+	if err := s.EnsureUserExists(ctx, userID); err != nil {
 		return nil, 0, err
 	}
 
@@ -127,28 +157,9 @@ func (s *Service) ProcessDueTransactions(ctx context.Context) error {
 	}
 
 	for _, recurring := range dueTransactions {
-		if recurring.EndDate != nil && today.After(*recurring.EndDate) {
+		if err := s.processRecurring(ctx, recurring, today); err != nil {
 			continue
 		}
-
-		tx := &transaction.Transaction{
-			Id:          pkg.GenerateULIDObject(),
-			UserId:      recurring.UserId,
-			Type:        transaction.Types(recurring.Type),
-			CategoryId:  recurring.CategoryId,
-			Amount:      recurring.Amount,
-			Description: recurring.Description + " (recorrente)",
-			Date:        today,
-			CreatedAt:   time.Now(),
-			UpdatedAt:   time.Now(),
-		}
-
-		if err := s.TransactionRepo.Create(ctx, tx); err != nil {
-			continue
-		}
-
-		nextDue := s.calculateNextDue(today, recurring.Frequency, recurring.DayOfMonth, recurring.DayOfWeek)
-		_ = s.Repository.UpdateLastProcessed(ctx, recurring.Id, today, nextDue)
 	}
 
 	return nil
@@ -160,12 +171,8 @@ func (s *Service) ProcessRecurringManually(ctx context.Context, recurringID, use
 		return nil, err
 	}
 
-	if !recurring.IsActive {
-		return nil, appErrors.NewValidationError("recurring", "transacao recorrente esta pausada")
-	}
-
-	if recurring.EndDate != nil && processDate != nil && processDate.After(*recurring.EndDate) {
-		return nil, appErrors.NewValidationError("process_date", "data de processamento e posterior a data de fim da recorrencia")
+	if err := s.validateManualProcess(recurring, processDate); err != nil {
+		return nil, err
 	}
 
 	date := time.Now().Truncate(24 * time.Hour)
@@ -173,24 +180,9 @@ func (s *Service) ProcessRecurringManually(ctx context.Context, recurringID, use
 		date = processDate.Truncate(24 * time.Hour)
 	}
 
-	if date.Before(recurring.StartDate) {
-		return nil, appErrors.NewValidationError("process_date", "nao e possivel processar antes da data de inicio")
-	}
-
-	tx := &transaction.Transaction{
-		Id:          pkg.GenerateULIDObject(),
-		UserId:      recurring.UserId,
-		Type:        transaction.Types(recurring.Type),
-		CategoryId:  recurring.CategoryId,
-		Amount:      recurring.Amount,
-		Description: recurring.Description + " (recorrente)",
-		Date:        date,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
-	}
-
-	if err := s.TransactionRepo.Create(ctx, tx); err != nil {
-		return nil, appErrors.NewDatabaseError(err)
+	tx, err := s.createTransactionFromRecurring(ctx, recurring, date)
+	if err != nil {
+		return nil, err
 	}
 
 	nextDue := s.calculateNextDue(date, recurring.Frequency, recurring.DayOfMonth, recurring.DayOfWeek)
@@ -199,32 +191,6 @@ func (s *Service) ProcessRecurringManually(ctx context.Context, recurringID, use
 	}
 
 	return tx, nil
-}
-
-func (s *Service) calculateNextDue(from time.Time, frequency FrequencyType, dayOfMonth, dayOfWeek int) time.Time {
-	switch frequency {
-	case FrequencyDaily:
-		return from.AddDate(0, 0, 1)
-	case FrequencyWeekly:
-		daysUntil := (dayOfWeek - int(from.Weekday()) + 7) % 7
-		if daysUntil == 0 {
-			daysUntil = 7
-		}
-		return from.AddDate(0, 0, daysUntil)
-	case FrequencyMonthly:
-		nextMonth := from.AddDate(0, 1, 0)
-		year, month, _ := nextMonth.Date()
-		lastDay := time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
-		day := dayOfMonth
-		if day > lastDay {
-			day = lastDay
-		}
-		return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
-	case FrequencyYearly:
-		return from.AddDate(1, 0, 0)
-	default:
-		return from.AddDate(0, 1, 0)
-	}
 }
 
 func (s *Service) validateCreateRequest(ctx context.Context, req *CreateRecurringRequest) error {
@@ -240,9 +206,10 @@ func (s *Service) validateCreateRequest(ctx context.Context, req *CreateRecurrin
 		return appErrors.NewValidationError("type", "tipo invalido")
 	}
 
-	_, err := s.CategoryRepository.GetByID(ctx, req.CategoryId, req.UserId)
-	if err != nil {
-		return appErrors.ErrCategoryNotFound
+	if s.CategoryService != nil {
+		if err := s.CategoryService.ValidateAndEnsureExists(ctx, req.CategoryId, req.UserId); err != nil {
+			return err
+		}
 	}
 
 	if req.Frequency == FrequencyMonthly && (req.DayOfMonth < 1 || req.DayOfMonth > 31) {
@@ -256,17 +223,114 @@ func (s *Service) validateCreateRequest(ctx context.Context, req *CreateRecurrin
 	return nil
 }
 
-func (s *Service) ensureUserExists(ctx context.Context, userID ulid.ULID) error {
-	if s.UserService == nil {
-		return appErrors.ErrInternalServer
+func (s *Service) validateManualProcess(recurring *RecurringTransaction, processDate *time.Time) error {
+	if !recurring.IsActive {
+		return appErrors.NewValidationError("recurring", "transacao recorrente esta pausada")
 	}
 
-	_, err := s.UserService.GetByID(ctx, userID)
-	if err != nil {
-		return appErrors.ErrUserNotFound.WithError(err)
+	if recurring.AccountId == nil {
+		return appErrors.NewValidationError("account_id", "transacao recorrente nao possui conta associada")
+	}
+
+	date := time.Now().Truncate(24 * time.Hour)
+	if processDate != nil {
+		date = processDate.Truncate(24 * time.Hour)
+	}
+
+	if recurring.EndDate != nil && date.After(*recurring.EndDate) {
+		return appErrors.NewValidationError("process_date", "data de processamento e posterior a data de fim da recorrencia")
+	}
+
+	if date.Before(recurring.StartDate) {
+		return appErrors.NewValidationError("process_date", "nao e possivel processar antes da data de inicio")
+	}
+
+	if recurring.LastProcessed != nil {
+		lastProcessedDate := recurring.LastProcessed.Truncate(24 * time.Hour)
+		if lastProcessedDate.Equal(date) {
+			return appErrors.NewValidationError("recurring", "transacao recorrente ja foi processada hoje")
+		}
 	}
 
 	return nil
+}
+
+func (s *Service) processRecurring(ctx context.Context, recurring *RecurringTransaction, today time.Time) error {
+	if recurring.EndDate != nil && today.After(*recurring.EndDate) {
+		return nil
+	}
+
+	if recurring.AccountId == nil {
+		return nil
+	}
+
+	_, err := s.createTransactionFromRecurring(ctx, recurring, today)
+	if err != nil {
+		return err
+	}
+
+	nextDue := s.calculateNextDue(today, recurring.Frequency, recurring.DayOfMonth, recurring.DayOfWeek)
+	_ = s.Repository.UpdateLastProcessed(ctx, recurring.Id, today, nextDue)
+
+	return nil
+}
+
+func (s *Service) createTransactionFromRecurring(ctx context.Context, recurring *RecurringTransaction, date time.Time) (*transaction.Transaction, error) {
+	categoryID := &recurring.CategoryId
+	tx := &transaction.Transaction{
+		Id:          pkg.GenerateULIDObject(),
+		UserId:      recurring.UserId,
+		AccountId:   *recurring.AccountId,
+		Type:        transaction.Types(recurring.Type),
+		CategoryId:  categoryID,
+		Amount:      recurring.Amount,
+		Description: recurring.Description + " (recorrente)",
+		Date:        date,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+
+	if s.TransactionService != nil {
+		if err := s.TransactionService.CreateTransaction(ctx, tx); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := s.TransactionRepo.Create(ctx, tx); err != nil {
+			return nil, appErrors.NewDatabaseError(err)
+		}
+	}
+
+	return tx, nil
+}
+
+func (s *Service) calculateNextDue(from time.Time, frequency FrequencyType, dayOfMonth, dayOfWeek int) time.Time {
+	switch frequency {
+	case FrequencyDaily:
+		return from.AddDate(0, 0, 1)
+
+	case FrequencyWeekly:
+		daysUntil := (dayOfWeek - int(from.Weekday()) + 7) % 7
+		if daysUntil == 0 {
+			daysUntil = 7
+		}
+		return from.AddDate(0, 0, daysUntil)
+
+	case FrequencyMonthly:
+		nextMonth := from.AddDate(0, 1, 0)
+		year, month, _ := nextMonth.Date()
+		lastDay := time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
+		day := dayOfMonth
+		if day > lastDay {
+			day = lastDay
+		}
+		return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
+
+	case FrequencyYearly:
+		return from.AddDate(1, 0, 0)
+
+	default:
+		return from.AddDate(0, 1, 0)
+	}
 }
 
 type CreateRecurringRequest struct {
@@ -288,4 +352,5 @@ type UpdateRecurringRequest struct {
 	Description *string
 	IsActive    *bool
 	EndDate     *time.Time
+	NextDue     *time.Time
 }
