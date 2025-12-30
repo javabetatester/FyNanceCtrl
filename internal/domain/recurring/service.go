@@ -15,16 +15,16 @@ import (
 )
 
 type Service struct {
-	Repository         Repository
-	TransactionRepo    transaction.Repository
+	Repository         RecurringRepository
+	TransactionRepo    transaction.TransactionRepository
 	CategoryService    *category.Service
 	TransactionService transaction.TransactionHandler
 	shared.BaseService
 }
 
 func NewService(
-	repo Repository,
-	transactionRepo transaction.Repository,
+	repo RecurringRepository,
+	transactionRepo transaction.TransactionRepository,
 	categoryService *category.Service,
 	transactionService transaction.TransactionHandler,
 	userChecker *shared.UserCheckerService,

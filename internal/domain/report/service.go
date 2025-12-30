@@ -11,7 +11,7 @@ import (
 )
 
 type Service struct {
-	Repository  Repository
+	Repository  ReportRepository
 	UserService *user.Service
 }
 

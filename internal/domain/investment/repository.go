@@ -12,7 +12,7 @@ type InvestmentFilters struct {
 	Type *string
 }
 
-type Repository interface {
+type InvestmentRepository interface {
 	Create(ctx context.Context, investment *Investment) error
 	List(ctx context.Context, userId ulid.ULID, filters *InvestmentFilters, pagination *pkg.PaginationParams) ([]*Investment, int64, error)
 	Update(ctx context.Context, investment *Investment) error

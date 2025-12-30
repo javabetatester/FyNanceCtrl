@@ -14,13 +14,13 @@ import (
 )
 
 type Service struct {
-	Repository     user.Repository
+	Repository     user.UserRepository
 	UserService    *user.Service
 	GoogleClientID string
 }
 
 func NewService(
-	repo user.Repository,
+	repo user.UserRepository,
 	userSvc *user.Service,
 	googleClientID string,
 ) *Service {

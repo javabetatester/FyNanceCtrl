@@ -8,7 +8,7 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-type Repository interface {
+type AccountRepository interface {
 	Create(ctx context.Context, account *Account) error
 	Update(ctx context.Context, account *Account) error
 	Delete(ctx context.Context, accountID, userID ulid.ULID) error

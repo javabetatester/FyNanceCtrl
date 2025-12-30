@@ -16,7 +16,7 @@ type GoalRepository struct {
 	DB *gorm.DB
 }
 
-var _ goal.Repository = (*GoalRepository)(nil)
+var _ goal.GoalRepository = (*GoalRepository)(nil)
 
 type goalDB struct {
 	Id            string  `gorm:"type:varchar(26);primaryKey"`

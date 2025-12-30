@@ -8,7 +8,7 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-type Repository interface {
+type CategoryRepository interface {
 	Create(ctx context.Context, category *Category) error
 	Update(ctx context.Context, category *Category) error
 	Delete(ctx context.Context, categoryID ulid.ULID, userID ulid.ULID) error

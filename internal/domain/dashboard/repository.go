@@ -8,7 +8,7 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-type Repository interface {
+type DashboardRepository interface {
 	GetFinancialSummary(ctx context.Context, userID ulid.ULID, accountID *ulid.ULID, month, year int) (*FinancialSummary, error)
 	GetMonthlyTrend(ctx context.Context, userID ulid.ULID, accountID *ulid.ULID, months int) ([]*MonthlyTrendItem, error)
 	GetExpensesByCategory(ctx context.Context, userID ulid.ULID, accountID *ulid.ULID, month, year int) ([]*CategoryExpense, error)

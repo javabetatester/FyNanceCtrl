@@ -12,7 +12,7 @@ type BudgetFilters struct {
 	Search *string
 }
 
-type Repository interface {
+type BudgetRepository interface {
 	Create(ctx context.Context, budget *Budget) error
 	Update(ctx context.Context, budget *Budget) error
 	Delete(ctx context.Context, budgetID, userID ulid.ULID) error

@@ -9,7 +9,7 @@ import (
 )
 
 type Service struct {
-	Repository Repository
+	Repository DashboardRepository
 }
 
 func (s *Service) GetDashboard(ctx context.Context, userID ulid.ULID, accountID *ulid.ULID, month, year int) (*DashboardResponse, error) {

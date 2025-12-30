@@ -17,7 +17,7 @@ import (
 )
 
 type Service struct {
-	Repository        Repository
+	Repository        TransactionRepository
 	CategoryService   category.CategoryServiceInterface
 	AccountService    account.AccountServiceInterface
 	BudgetService     shared.BudgetUpdater
@@ -29,7 +29,7 @@ type Service struct {
 var _ TransactionHandler = (*Service)(nil)
 
 func NewService(
-	repo Repository,
+	repo TransactionRepository,
 	categoryService category.CategoryServiceInterface,
 	accountService account.AccountServiceInterface,
 	budgetService shared.BudgetUpdater,

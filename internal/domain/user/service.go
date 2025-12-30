@@ -13,12 +13,12 @@ import (
 )
 
 type Service struct {
-	Repository Repository
+	Repository UserRepository
 }
 
 var _ shared.UserChecker = (*Service)(nil)
 
-func NewService(repo Repository) *Service {
+func NewService(repo UserRepository) *Service {
 	return &Service{Repository: repo}
 }
 

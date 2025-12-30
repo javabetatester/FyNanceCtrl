@@ -15,7 +15,7 @@ type AccountRepository struct {
 	DB *gorm.DB
 }
 
-var _ account.Repository = (*AccountRepository)(nil)
+var _ account.AccountRepository = (*AccountRepository)(nil)
 
 type accountDB struct {
 	Id             string    `gorm:"type:varchar(26);primaryKey"`

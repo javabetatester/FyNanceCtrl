@@ -14,7 +14,7 @@ type ReportRepository struct {
 	DB *gorm.DB
 }
 
-var _ report.Repository = (*ReportRepository)(nil)
+var _ report.ReportRepository = (*ReportRepository)(nil)
 
 func (r *ReportRepository) GetMonthlyReport(userID ulid.ULID, month, year int) (*report.MonthlyReport, error) {
 	startDate := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)

@@ -18,7 +18,7 @@ type TransactionFilters struct {
 	DateTo     *time.Time
 }
 
-type Repository interface {
+type TransactionRepository interface {
 	Create(ctx context.Context, transaction *Transaction) error
 	Update(ctx context.Context, transaction *Transaction) error
 	Delete(ctx context.Context, transactionID ulid.ULID) error
@@ -32,4 +32,4 @@ type Repository interface {
 	GetNumberOfTransactions(ctx context.Context, userID ulid.ULID) (int64, error)
 }
 
-type CategoryRepository = category.Repository
+type CategoryRepository = category.CategoryRepository

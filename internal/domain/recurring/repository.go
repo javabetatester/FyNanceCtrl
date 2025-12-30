@@ -9,7 +9,7 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-type Repository interface {
+type RecurringRepository interface {
 	Create(ctx context.Context, recurring *RecurringTransaction) error
 	Update(ctx context.Context, recurring *RecurringTransaction) error
 	Delete(ctx context.Context, recurringID, userID ulid.ULID) error

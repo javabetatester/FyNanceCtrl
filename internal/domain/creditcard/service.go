@@ -15,7 +15,7 @@ import (
 )
 
 type Service struct {
-	Repository     Repository
+	Repository     CreditCardRepository
 	AccountService *account.Service
 	UserService    *user.Service
 }

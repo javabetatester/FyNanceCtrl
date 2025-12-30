@@ -16,15 +16,15 @@ import (
 )
 
 type Service struct {
-	Repository      Repository
-	TransactionRepo transaction.Repository
+	Repository      InvestmentRepository
+	TransactionRepo transaction.TransactionRepository
 	AccountService  account.AccountServiceInterface
 	shared.BaseService
 }
 
 var _ shared.InvestmentTransactionDeleter = (*Service)(nil)
 
-func NewService(repo Repository, transactionRepo transaction.Repository, accountService account.AccountServiceInterface, userChecker *shared.UserCheckerService) *Service {
+func NewService(repo InvestmentRepository, transactionRepo transaction.TransactionRepository, accountService account.AccountServiceInterface, userChecker *shared.UserCheckerService) *Service {
 	return &Service{
 		Repository:      repo,
 		TransactionRepo: transactionRepo,

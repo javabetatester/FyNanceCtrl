@@ -17,7 +17,7 @@ type CreditCardRepository struct {
 	DB *gorm.DB
 }
 
-var _ creditcard.Repository = (*CreditCardRepository)(nil)
+var _ creditcard.CreditCardRepository = (*CreditCardRepository)(nil)
 
 type creditCardDB struct {
 	Id             string    `gorm:"type:varchar(26);primaryKey"`

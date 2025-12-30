@@ -8,7 +8,7 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-type Repository interface {
+type CreditCardRepository interface {
 	CreateCreditCard(ctx context.Context, card *CreditCard) error
 	UpdateCreditCard(ctx context.Context, card *CreditCard) error
 	DeleteCreditCard(ctx context.Context, cardID, userID ulid.ULID) error

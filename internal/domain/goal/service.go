@@ -19,7 +19,7 @@ import (
 )
 
 type Service struct {
-	Repository         Repository
+	Repository         GoalRepository
 	AccountService     account.AccountServiceInterface
 	TransactionService transaction.TransactionHandler
 	shared.BaseService
@@ -27,7 +27,7 @@ type Service struct {
 
 var _ shared.GoalContributionDeleter = (*Service)(nil)
 
-func NewService(repo Repository, accountService account.AccountServiceInterface, transactionService transaction.TransactionHandler, userChecker *shared.UserCheckerService) *Service {
+func NewService(repo GoalRepository, accountService account.AccountServiceInterface, transactionService transaction.TransactionHandler, userChecker *shared.UserCheckerService) *Service {
 	return &Service{
 		Repository:         repo,
 		AccountService:     accountService,

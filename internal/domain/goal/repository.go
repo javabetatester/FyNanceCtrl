@@ -12,7 +12,7 @@ type GoalFilters struct {
 	Status *GoalStatus
 }
 
-type Repository interface {
+type GoalRepository interface {
 	Create(ctx context.Context, goal *Goal) error
 	List(ctx context.Context, pagination *pkg.PaginationParams) ([]*Goal, int64, error)
 	Update(ctx context.Context, goal *Goal) error

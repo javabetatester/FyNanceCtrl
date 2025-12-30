@@ -16,14 +16,14 @@ import (
 )
 
 type Service struct {
-	Repository      Repository
+	Repository      BudgetRepository
 	CategoryService *category.Service
 	shared.BaseService
 }
 
 var _ shared.BudgetUpdater = (*Service)(nil)
 
-func NewService(repo Repository, categoryService *category.Service, userChecker *shared.UserCheckerService) *Service {
+func NewService(repo BudgetRepository, categoryService *category.Service, userChecker *shared.UserCheckerService) *Service {
 	return &Service{
 		Repository:      repo,
 		CategoryService: categoryService,

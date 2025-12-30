@@ -14,13 +14,13 @@ import (
 )
 
 type Service struct {
-	Repository Repository
+	Repository CategoryRepository
 	shared.BaseService
 }
 
 var _ CategoryServiceInterface = (*Service)(nil)
 
-func NewService(repo Repository, userChecker *shared.UserCheckerService) *Service {
+func NewService(repo CategoryRepository, userChecker *shared.UserCheckerService) *Service {
 	return &Service{
 		Repository: repo,
 		BaseService: shared.BaseService{
