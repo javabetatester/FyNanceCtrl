@@ -5,6 +5,7 @@ import "github.com/oklog/ulid/v2"
 type CreateInvestmentRequest struct {
 	UserId        ulid.ULID `json:"user_id"`
 	AccountId     ulid.ULID `json:"account_id"`
+	CategoryId    ulid.ULID `json:"category_id"`
 	Type          string    `json:"type"`
 	Name          string    `json:"name"`
 	InitialAmount float64   `json:"initial_amount"`
@@ -27,9 +28,9 @@ type WithdrawRequest struct {
 }
 
 type UpdateInvestmentRequest struct {
-	UserId     ulid.ULID `json:"user_id"`
-	Id         ulid.ULID `json:"id"`
-	Name       *string   `json:"name,omitempty"`
-	Type       *string   `json:"type,omitempty"`
-	ReturnRate *float64  `json:"return_rate,omitempty"`
+	UserId         ulid.ULID `json:"user_id"`
+	Id             ulid.ULID `json:"id"`
+	Name           *string   `json:"name,omitempty"`
+	Type           *string   `json:"type,omitempty"`
+	CurrentBalance *float64  `json:"current_balance,omitempty"`
 }
