@@ -2,18 +2,22 @@ package main
 
 import (
 	"log"
+	"os"
 	"time"
 
 	"Fynance/config"
 	"Fynance/internal/domain/account"
 	"Fynance/internal/domain/auth"
 	"Fynance/internal/domain/budget"
+	"Fynance/internal/domain/category"
 	"Fynance/internal/domain/creditcard"
 	"Fynance/internal/domain/dashboard"
 	"Fynance/internal/domain/goal"
+	"Fynance/internal/domain/healthscore"
 	"Fynance/internal/domain/investment"
 	"Fynance/internal/domain/recurring"
 	"Fynance/internal/domain/report"
+	"Fynance/internal/domain/shared"
 	"Fynance/internal/domain/transaction"
 	"Fynance/internal/domain/user"
 	"Fynance/internal/infrastructure"
@@ -30,8 +34,12 @@ import (
 )
 
 func main() {
-	_ = godotenv.Load()
-	_ = godotenv.Load("../../.env")
+	if err := godotenv.Load(); err != nil {
+		log.Printf("Aviso: não foi possível carregar .env do diretório atual: %v", err)
+	}
+	if err := godotenv.Load("../../.env"); err != nil {
+		log.Printf("Aviso: não foi possível carregar ../../.env: %v", err)
+	}
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -57,86 +65,122 @@ func main() {
 	creditCardRepo := &infrastructure.CreditCardRepository{DB: db}
 	resourceCounter := &infrastructure.ResourceCounter{DB: db}
 
-	userService := user.Service{
-		Repository: userRepo,
+	userService := user.NewService(userRepo)
+
+	userAdapter := user.NewUserServiceAdapter(userService)
+	userChecker := shared.NewUserCheckerService(userAdapter)
+
+	categoryService := category.NewService(categoryRepo, userChecker)
+
+	accountService := account.NewService(accountRepo, userChecker)
+
+	googleClientID := ""
+	envClientID := os.Getenv("GOOGLE_OAUTH_CLIENT_ID")
+	envEnabled := os.Getenv("GOOGLE_OAUTH_ENABLED")
+
+	logger.Info().
+		Str("env_google_oauth_enabled", envEnabled).
+		Str("env_google_oauth_client_id_preview", func() string {
+			if len(envClientID) > 20 {
+				return envClientID[:20] + "..."
+			}
+			return envClientID
+		}()).
+		Int("env_client_id_length", len(envClientID)).
+		Bool("config_google_oauth_enabled", cfg.GoogleOAuth.Enabled).
+		Str("config_client_id_preview", func() string {
+			if len(cfg.GoogleOAuth.ClientID) > 20 {
+				return cfg.GoogleOAuth.ClientID[:20] + "..."
+			}
+			return cfg.GoogleOAuth.ClientID
+		}()).
+		Int("config_client_id_length", len(cfg.GoogleOAuth.ClientID)).
+		Msg("Debug: Configuração Google OAuth")
+
+	if cfg.GoogleOAuth.Enabled {
+		if cfg.GoogleOAuth.ClientID == "" {
+			logger.Warn().
+				Msg("GOOGLE_OAUTH_ENABLED=true mas GOOGLE_OAUTH_CLIENT_ID está vazio. Verifique se a variável está definida no arquivo .env")
+		} else {
+			googleClientID = cfg.GoogleOAuth.ClientID
+			clientIDPreview := googleClientID
+			if len(clientIDPreview) > 20 {
+				clientIDPreview = clientIDPreview[:20] + "..."
+			}
+			logger.Info().
+				Str("client_id_preview", clientIDPreview).
+				Int("client_id_length", len(googleClientID)).
+				Msg("Google OAuth habilitado - Certifique-se de que este Client ID está autorizado no Google Console e corresponde ao usado no frontend")
+		}
+	} else {
+		logger.Info().Msg("Google OAuth desabilitado (GOOGLE_OAUTH_ENABLED não está definido como 'true')")
 	}
 
-	accountService := account.Service{
-		Repository:  accountRepo,
-		UserService: &userService,
-	}
+	authService := auth.NewService(
+		userRepo,
+		userService,
+		googleClientID,
+	)
 
-	transactionService := transaction.Service{
-		Repository:         transactionRepo,
-		CategoryRepository: categoryRepo,
-		UserService:        &userService,
-		AccountService:     &accountService,
-	}
+	budgetService := budget.NewService(budgetRepo, categoryService, userChecker)
 
-	authService := auth.Service{
-		Repository:      userRepo,
-		UserService:     &userService,
-		CategoryService: &transactionService,
-	}
+	transactionService := transaction.NewService(transactionRepo, categoryService, accountService, userChecker)
+	transactionService.SetBudgetService(budgetService)
 
-	goalService := goal.Service{
-		Repository:     goalRepo,
-		UserService:    userService,
-		AccountService: &accountService,
-	}
+	goalService := goal.NewService(goalRepo, accountService, userChecker)
+	goalService.SetTransactionService(transactionService)
 
-	investmentService := investment.Service{
-		Repository:      investmentRepo,
-		TransactionRepo: transactionRepo,
-		UserService:     &userService,
-	}
+	transactionService.SetGoalService(goalService)
 
-	budgetService := budget.Service{
-		Repository:         budgetRepo,
-		CategoryRepository: categoryRepo,
-		UserService:        &userService,
-	}
+	investmentService := investment.NewService(investmentRepo, transactionRepo, accountService, userChecker)
+
+	transactionService.SetInvestmentService(investmentService)
 
 	dashboardService := dashboard.Service{
 		Repository: dashboardRepo,
 	}
 
-	recurringService := recurring.Service{
-		Repository:         recurringRepo,
-		TransactionRepo:    transactionRepo,
-		CategoryRepository: categoryRepo,
-		UserService:        &userService,
-	}
+	recurringService := recurring.NewService(recurringRepo, transactionRepo, categoryService, userChecker)
+	recurringService.SetTransactionService(transactionService)
 
 	reportService := report.Service{
 		Repository:  reportRepo,
-		UserService: &userService,
+		UserService: userService,
 	}
 
 	creditCardService := creditcard.Service{
 		Repository:     creditCardRepo,
-		AccountService: &accountService,
-		UserService:    &userService,
+		AccountService: accountService,
+		UserService:    userService,
 	}
 
-	jwtService, err := middleware.NewJwtService(cfg.JWT, &userService)
+	jwtService, err := middleware.NewJwtService(cfg.JWT, userService)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("Falha ao inicializar servico JWT")
 	}
 
 	handler := routes.Handler{
-		UserService:        userService,
+		UserService:        *userService,
 		JwtService:         jwtService,
-		AuthService:        authService,
-		GoalService:        goalService,
-		TransactionService: transactionService,
-		InvestmentService:  investmentService,
-		AccountService:     accountService,
-		BudgetService:      budgetService,
+		AuthService:        *authService,
+		GoalService:        *goalService,
+		TransactionService: *transactionService,
+		InvestmentService:  *investmentService,
+		AccountService:     *accountService,
+		BudgetService:      *budgetService,
 		DashboardService:   dashboardService,
-		RecurringService:   recurringService,
+		RecurringService:   *recurringService,
 		ReportService:      reportService,
 		CreditCardService:  creditCardService,
+
+		AccountRepository:     accountRepo,
+		TransactionRepository: transactionRepo,
+		GoalRepository:        goalRepo,
+		BudgetRepository:      budgetRepo,
+		InvestmentRepository:  investmentRepo,
+		RecurringRepository:   recurringRepo,
+		CreditCardRepository:  creditCardRepo,
+		CategoryRepository:    categoryRepo,
 	}
 
 	router := gin.Default()
@@ -152,6 +196,7 @@ func main() {
 	{
 		public.POST("/auth/login", handler.Authenticate)
 		public.POST("/auth/register", handler.Registration)
+		public.POST("/auth/google", handler.GoogleAuth)
 	}
 
 	private := router.Group("/api")
@@ -164,11 +209,14 @@ func main() {
 		users := private.Group("/users")
 		{
 			users.GET("/plan", handler.GetUserPlan)
+			users.PATCH("/me", handler.UpdateUserName)
+			users.PATCH("/me/password", handler.UpdateUserPassword)
+			users.DELETE("/me", handler.DeleteUser)
 		}
 
 		goals := private.Group("/goals")
 		{
-			goals.POST("", middleware.CheckResourceLimit("goals", resourceCounter), handler.CreateGoal)
+			goals.POST("", middleware.CheckResourceLimit("goals", resourceCounter, userService), handler.CreateGoal)
 			goals.PATCH("/:id", handler.UpdateGoal)
 			goals.GET("", handler.ListGoals)
 			goals.GET("/:id", handler.GetGoal)
@@ -177,11 +225,12 @@ func main() {
 			goals.POST("/:id/withdraw", handler.WithdrawFromGoal)
 			goals.GET("/:id/contributions", handler.GetGoalContributions)
 			goals.GET("/:id/progress", handler.GetGoalProgress)
+			goals.DELETE("/contributions/:contribution_id", handler.DeleteContribution)
 		}
 
 		transactions := private.Group("/transactions")
 		{
-			transactions.POST("", middleware.CheckResourceLimit("transactions", resourceCounter), handler.CreateTransaction)
+			transactions.POST("", middleware.CheckResourceLimit("transactions", resourceCounter, userService), handler.CreateTransaction)
 			transactions.GET("", handler.GetTransactions)
 			transactions.GET("/:id", handler.GetTransaction)
 			transactions.PATCH("/:id", handler.UpdateTransaction)
@@ -190,7 +239,7 @@ func main() {
 
 		categories := private.Group("/categories")
 		{
-			categories.POST("", middleware.CheckResourceLimit("categories", resourceCounter), handler.CreateCategory)
+			categories.POST("", middleware.CheckResourceLimit("categories", resourceCounter, userService), handler.CreateCategory)
 			categories.GET("", handler.ListCategories)
 			categories.PATCH("/:id", handler.UpdateCategory)
 			categories.DELETE("/:id", handler.DeleteCategory)
@@ -198,7 +247,7 @@ func main() {
 
 		investments := private.Group("/investments")
 		{
-			investments.POST("", middleware.CheckResourceLimit("investments", resourceCounter), handler.CreateInvestment)
+			investments.POST("", middleware.CheckResourceLimit("investments", resourceCounter, userService), handler.CreateInvestment)
 			investments.GET("", handler.ListInvestments)
 			investments.GET("/:id", handler.GetInvestment)
 			investments.POST("/:id/contribution", handler.MakeContribution)
@@ -210,7 +259,7 @@ func main() {
 
 		accounts := private.Group("/accounts")
 		{
-			accounts.POST("", middleware.CheckResourceLimit("accounts", resourceCounter), handler.CreateAccount)
+			accounts.POST("", middleware.CheckResourceLimit("accounts", resourceCounter, userService), handler.CreateAccount)
 			accounts.GET("", handler.ListAccounts)
 			accounts.GET("/balance", handler.GetTotalBalance)
 			accounts.GET("/:id", handler.GetAccount)
@@ -221,7 +270,7 @@ func main() {
 
 		budgets := private.Group("/budgets")
 		{
-			budgets.POST("", middleware.CheckResourceLimit("budgets", resourceCounter), handler.CreateBudget)
+			budgets.POST("", middleware.CheckResourceLimit("budgets", resourceCounter, userService), handler.CreateBudget)
 			budgets.GET("", handler.ListBudgets)
 			budgets.GET("/summary", handler.GetBudgetSummary)
 			budgets.GET("/:id", handler.GetBudget)
@@ -232,7 +281,7 @@ func main() {
 
 		recurring := private.Group("/recurring")
 		{
-			recurring.POST("", middleware.CheckResourceLimit("recurring", resourceCounter), handler.CreateRecurring)
+			recurring.POST("", middleware.CheckResourceLimit("recurring", resourceCounter, userService), handler.CreateRecurring)
 			recurring.GET("", handler.ListRecurrings)
 			recurring.GET("/:id", handler.GetRecurring)
 			recurring.PATCH("/:id", handler.UpdateRecurring)
@@ -253,7 +302,7 @@ func main() {
 
 		creditCards := private.Group("/credit-cards")
 		{
-			creditCards.POST("", middleware.CheckResourceLimit("credit_cards", resourceCounter), handler.CreateCreditCard)
+			creditCards.POST("", middleware.CheckResourceLimit("credit_cards", resourceCounter, userService), handler.CreateCreditCard)
 			creditCards.GET("", handler.ListCreditCards)
 			creditCards.GET("/:id", handler.GetCreditCard)
 			creditCards.PATCH("/:id", handler.UpdateCreditCard)
@@ -262,9 +311,13 @@ func main() {
 			creditCards.GET("/:id/invoices/current", handler.GetCurrentInvoice)
 			creditCards.GET("/:id/invoices/:invoiceId", handler.GetInvoice)
 			creditCards.POST("/:id/invoices/:invoiceId/pay", handler.PayInvoice)
-			creditCards.POST("/:id/transactions", handler.CreateCreditCardTransaction)
-			creditCards.GET("/:id/transactions", handler.ListCreditCardTransactions)
+		creditCards.POST("/:id/transactions", handler.CreateCreditCardTransaction)
+		creditCards.GET("/:id/transactions", handler.ListCreditCardTransactions)
 		}
+
+		healthScoreService := healthscore.NewService()
+		healthScoreHandler := routes.NewHealthScoreHandler(healthScoreService)
+		private.GET("/health-score", healthScoreHandler.GetHealthScore)
 	}
 
 	serverAddr := ":" + cfg.Server.Port

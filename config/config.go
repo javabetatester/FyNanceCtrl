@@ -9,10 +9,11 @@ import (
 )
 
 type Config struct {
-	Database DatabaseConfig
-	Server   ServerConfig
-	JWT      JWTConfig
-	App      AppConfig
+	Database    DatabaseConfig
+	Server      ServerConfig
+	JWT         JWTConfig
+	App         AppConfig
+	GoogleOAuth GoogleOAuthConfig
 }
 
 type DatabaseConfig struct {
@@ -47,6 +48,13 @@ type AppConfig struct {
 	LogLevel    string
 }
 
+type GoogleOAuthConfig struct {
+	ClientID     string
+	ClientSecret string
+	RedirectURL  string
+	Enabled      bool
+}
+
 func Load() (*Config, error) {
 	database, err := loadDatabaseConfig()
 	if err != nil {
@@ -57,10 +65,11 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	return &Config{
-		Database: database,
-		Server:   loadServerConfig(),
-		JWT:      jwtCfg,
-		App:      loadAppConfig(),
+		Database:    database,
+		Server:      loadServerConfig(),
+		JWT:         jwtCfg,
+		App:         loadAppConfig(),
+		GoogleOAuth: loadGoogleOAuthConfig(),
 	}, nil
 }
 
@@ -186,4 +195,19 @@ func requireEnv(key string) (string, error) {
 		return "", fmt.Errorf("%s precisa ser definido", key)
 	}
 	return value, nil
+}
+
+func loadGoogleOAuthConfig() GoogleOAuthConfig {
+	clientID := getEnv("GOOGLE_OAUTH_CLIENT_ID", "")
+	clientSecret := getEnv("GOOGLE_OAUTH_CLIENT_SECRET", "")
+	redirectURL := getEnv("GOOGLE_OAUTH_REDIRECT_URL", "")
+	enabledStr := strings.ToLower(strings.TrimSpace(getEnv("GOOGLE_OAUTH_ENABLED", "false")))
+	enabled := enabledStr == "true" || enabledStr == "1"
+
+	return GoogleOAuthConfig{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		RedirectURL:  redirectURL,
+		Enabled:      enabled,
+	}
 }
