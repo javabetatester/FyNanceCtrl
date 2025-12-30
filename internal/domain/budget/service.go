@@ -2,32 +2,50 @@ package budget
 
 import (
 	"context"
+	"errors"
 	"time"
 
-	"Fynance/internal/domain/transaction"
-	"Fynance/internal/domain/user"
+	"Fynance/internal/domain/category"
+	"Fynance/internal/domain/shared"
 	appErrors "Fynance/internal/errors"
+	"Fynance/internal/logger"
 	"Fynance/internal/pkg"
 
 	"github.com/oklog/ulid/v2"
+	"gorm.io/gorm"
 )
 
 type Service struct {
-	Repository         Repository
-	CategoryRepository transaction.CategoryRepository
-	UserService        *user.Service
+	Repository      Repository
+	CategoryService *category.Service
+	shared.BaseService
+}
+
+func NewService(repo Repository, categoryService *category.Service, userChecker *shared.UserCheckerService) *Service {
+	return &Service{
+		Repository:      repo,
+		CategoryService: categoryService,
+		BaseService: shared.BaseService{
+			UserChecker: userChecker,
+		},
+	}
 }
 
 func (s *Service) CreateBudget(ctx context.Context, req *CreateBudgetRequest) (*Budget, error) {
-	if err := s.ensureUserExists(ctx, req.UserId); err != nil {
+	if err := s.EnsureUserExists(ctx, req.UserId); err != nil {
 		return nil, err
 	}
 
-	if err := s.validateCreateRequest(ctx, req); err != nil {
+	categoryID, err := s.resolveCategoryID(ctx, req.CategoryId, req.UserId)
+	if err != nil {
 		return nil, err
 	}
 
-	existing, _ := s.Repository.GetByCategoryId(ctx, req.CategoryId, req.UserId, req.Month, req.Year)
+	if err := s.validateCreateRequest(req); err != nil {
+		return nil, err
+	}
+
+	existing, _ := s.Repository.GetByCategoryId(ctx, categoryID, req.UserId, req.Month, req.Year)
 	if existing != nil {
 		return nil, appErrors.NewConflictError("orcamento para esta categoria neste periodo")
 	}
@@ -36,24 +54,22 @@ func (s *Service) CreateBudget(ctx context.Context, req *CreateBudgetRequest) (*
 	budget := &Budget{
 		Id:          pkg.GenerateULIDObject(),
 		UserId:      req.UserId,
-		CategoryId:  req.CategoryId,
+		CategoryId:  categoryID,
 		Amount:      req.Amount,
 		Spent:       0,
 		Month:       req.Month,
 		Year:        req.Year,
-		AlertAt:     req.AlertAt,
+		AlertAt:     s.normalizeAlertAt(req.AlertAt),
 		IsRecurring: req.IsRecurring,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
 
-	if budget.AlertAt <= 0 {
-		budget.AlertAt = 80
-	}
-
 	if err := s.Repository.Create(ctx, budget); err != nil {
 		return nil, appErrors.NewDatabaseError(err)
 	}
+
+	s.loadCategoryName(ctx, budget)
 
 	return budget, nil
 }
@@ -88,12 +104,14 @@ func (s *Service) UpdateBudget(ctx context.Context, budgetID, userID ulid.ULID, 
 }
 
 func (s *Service) DeleteBudget(ctx context.Context, budgetID, userID ulid.ULID) error {
-	_, err := s.GetBudgetByID(ctx, budgetID, userID)
-	if err != nil {
-		return err
+	result := s.Repository.Delete(ctx, budgetID, userID)
+	if result != nil {
+		if errors.Is(result, gorm.ErrRecordNotFound) {
+			return appErrors.ErrNotFound
+		}
+		return appErrors.NewDatabaseError(result)
 	}
-
-	return s.Repository.Delete(ctx, budgetID, userID)
+	return nil
 }
 
 func (s *Service) GetBudgetByID(ctx context.Context, budgetID, userID ulid.ULID) (*Budget, error) {
@@ -109,40 +127,54 @@ func (s *Service) GetBudgetByID(ctx context.Context, budgetID, userID ulid.ULID)
 	return budget, nil
 }
 
-func (s *Service) ListBudgets(ctx context.Context, userID ulid.ULID, month, year int, pagination *pkg.PaginationParams) ([]*Budget, int64, error) {
-	if err := s.ensureUserExists(ctx, userID); err != nil {
+func (s *Service) ListBudgets(ctx context.Context, userID ulid.ULID, month, year int, filters *BudgetFilters, pagination *pkg.PaginationParams) ([]*Budget, int64, error) {
+	if err := s.EnsureUserExists(ctx, userID); err != nil {
 		return nil, 0, err
 	}
 
-	if month <= 0 || month > 12 {
-		month = int(time.Now().Month())
-	}
-	if year <= 0 {
-		year = time.Now().Year()
-	}
-
-	return s.Repository.GetByUserId(ctx, userID, month, year, pagination)
+	return s.Repository.GetByUserId(ctx, userID, month, year, filters, pagination)
 }
 
 func (s *Service) GetBudgetSummary(ctx context.Context, userID ulid.ULID, month, year int) (*BudgetSummary, error) {
-	if err := s.ensureUserExists(ctx, userID); err != nil {
+	if err := s.EnsureUserExists(ctx, userID); err != nil {
 		return nil, err
 	}
 
-	if month <= 0 || month > 12 {
-		month = int(time.Now().Month())
-	}
-	if year <= 0 {
-		year = time.Now().Year()
-	}
+	month, year = s.normalizePeriod(month, year)
 
 	return s.Repository.GetSummary(ctx, userID, month, year)
 }
 
 func (s *Service) UpdateSpent(ctx context.Context, categoryID, userID ulid.ULID, amount float64) error {
-	now := time.Now()
-	budget, err := s.Repository.GetByCategoryId(ctx, categoryID, userID, int(now.Month()), now.Year())
+	return s.UpdateSpentWithDate(ctx, categoryID, userID, amount, time.Now())
+}
+
+func (s *Service) UpdateSpentWithDate(ctx context.Context, categoryID, userID ulid.ULID, amount float64, transactionDate time.Time) error {
+	budget, err := s.Repository.GetByCategoryId(ctx, categoryID, userID, int(transactionDate.Month()), transactionDate.Year())
+
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			resolvedID, resolveErr := s.resolveCategoryID(ctx, categoryID, userID)
+			if resolveErr == nil && resolvedID != categoryID {
+				budget, err = s.Repository.GetByCategoryId(ctx, resolvedID, userID, int(transactionDate.Month()), transactionDate.Year())
+				if err == nil && budget != nil {
+					return s.Repository.UpdateSpent(ctx, budget.Id, amount)
+				}
+			}
+
+			logger.Debug().
+				Str("category_id", categoryID.String()).
+				Str("user_id", userID.String()).
+				Int("month", int(transactionDate.Month())).
+				Int("year", transactionDate.Year()).
+				Msg("budget not found for category, skipping update")
+		} else {
+			logger.Error().
+				Err(err).
+				Str("category_id", categoryID.String()).
+				Str("user_id", userID.String()).
+				Msg("error getting budget for category")
+		}
 		return nil
 	}
 
@@ -155,28 +187,7 @@ func (s *Service) GetBudgetStatus(ctx context.Context, budgetID, userID ulid.ULI
 		return nil, err
 	}
 
-	remaining := budget.Amount - budget.Spent
-	percentage := 0.0
-	if budget.Amount > 0 {
-		percentage = (budget.Spent / budget.Amount) * 100
-	}
-
-	status := "OK"
-	if percentage >= 100 {
-		status = "EXCEEDED"
-	} else if percentage >= budget.AlertAt {
-		status = "WARNING"
-	}
-
-	return &BudgetStatusResponse{
-		BudgetId:   budget.Id,
-		Amount:     budget.Amount,
-		Spent:      budget.Spent,
-		Remaining:  remaining,
-		Percentage: percentage,
-		Status:     status,
-		AlertAt:    budget.AlertAt,
-	}, nil
+	return s.calculateBudgetStatus(budget), nil
 }
 
 func (s *Service) CreateRecurringBudgets(ctx context.Context, userID ulid.ULID) error {
@@ -215,7 +226,30 @@ func (s *Service) CreateRecurringBudgets(ctx context.Context, userID ulid.ULID) 
 	return nil
 }
 
-func (s *Service) validateCreateRequest(ctx context.Context, req *CreateBudgetRequest) error {
+func (s *Service) resolveCategoryID(ctx context.Context, categoryID, userID ulid.ULID) (ulid.ULID, error) {
+	if s.CategoryService == nil {
+		return categoryID, nil
+	}
+
+	if err := s.CategoryService.ValidateAndEnsureExists(ctx, categoryID, userID); err != nil {
+		return ulid.ULID{}, err
+	}
+
+	return s.CategoryService.ResolveCategoryID(ctx, categoryID, userID)
+}
+
+func (s *Service) loadCategoryName(ctx context.Context, budget *Budget) {
+	if s.CategoryService == nil {
+		return
+	}
+
+	cat, err := s.CategoryService.GetByID(ctx, budget.CategoryId, budget.UserId)
+	if err == nil && cat != nil {
+		budget.CategoryName = cat.Name
+	}
+}
+
+func (s *Service) validateCreateRequest(req *CreateBudgetRequest) error {
 	if req.Amount <= 0 {
 		return appErrors.NewValidationError("amount", "deve ser maior que zero")
 	}
@@ -228,25 +262,50 @@ func (s *Service) validateCreateRequest(ctx context.Context, req *CreateBudgetRe
 		return appErrors.NewValidationError("year", "ano invalido")
 	}
 
-	_, err := s.CategoryRepository.GetByID(ctx, req.CategoryId, req.UserId)
-	if err != nil {
-		return appErrors.ErrCategoryNotFound
-	}
-
 	return nil
 }
 
-func (s *Service) ensureUserExists(ctx context.Context, userID ulid.ULID) error {
-	if s.UserService == nil {
-		return appErrors.ErrInternalServer
+func (s *Service) normalizeAlertAt(alertAt float64) float64 {
+	if alertAt <= 0 {
+		return 80
+	}
+	return alertAt
+}
+
+func (s *Service) normalizePeriod(month, year int) (int, int) {
+	now := time.Now()
+	if month <= 0 || month > 12 {
+		month = int(now.Month())
+	}
+	if year <= 0 {
+		year = now.Year()
+	}
+	return month, year
+}
+
+func (s *Service) calculateBudgetStatus(budget *Budget) *BudgetStatusResponse {
+	remaining := budget.Amount - budget.Spent
+	percentage := 0.0
+	if budget.Amount > 0 {
+		percentage = (budget.Spent / budget.Amount) * 100
 	}
 
-	_, err := s.UserService.GetByID(ctx, userID)
-	if err != nil {
-		return appErrors.ErrUserNotFound.WithError(err)
+	status := "OK"
+	if percentage >= 100 {
+		status = "EXCEEDED"
+	} else if percentage >= budget.AlertAt {
+		status = "WARNING"
 	}
 
-	return nil
+	return &BudgetStatusResponse{
+		BudgetId:   budget.Id,
+		Amount:     budget.Amount,
+		Spent:      budget.Spent,
+		Remaining:  remaining,
+		Percentage: percentage,
+		Status:     status,
+		AlertAt:    budget.AlertAt,
+	}
 }
 
 type CreateBudgetRequest struct {

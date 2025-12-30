@@ -8,12 +8,16 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+type BudgetFilters struct {
+	Search *string
+}
+
 type Repository interface {
 	Create(ctx context.Context, budget *Budget) error
 	Update(ctx context.Context, budget *Budget) error
 	Delete(ctx context.Context, budgetID, userID ulid.ULID) error
 	GetById(ctx context.Context, budgetID, userID ulid.ULID) (*Budget, error)
-	GetByUserId(ctx context.Context, userID ulid.ULID, month, year int, pagination *pkg.PaginationParams) ([]*Budget, int64, error)
+	GetByUserId(ctx context.Context, userID ulid.ULID, month, year int, filters *BudgetFilters, pagination *pkg.PaginationParams) ([]*Budget, int64, error)
 	GetByCategoryId(ctx context.Context, categoryID, userID ulid.ULID, month, year int) (*Budget, error)
 	UpdateSpent(ctx context.Context, budgetID ulid.ULID, amount float64) error
 	GetRecurring(ctx context.Context, userID ulid.ULID, pagination *pkg.PaginationParams) ([]*Budget, int64, error)
