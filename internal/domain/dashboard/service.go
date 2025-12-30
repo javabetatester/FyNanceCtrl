@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"Fynance/internal/domain/category"
 	"context"
 	"time"
 
@@ -54,6 +55,16 @@ func (s *Service) GetDashboard(ctx context.Context, userID ulid.ULID, accountID 
 		return nil, err
 	}
 
+	categories, err := s.Repository.GetUserCategories(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	monthExpenses, err := s.Repository.GetMonthExpenses(ctx, userID, accountID, month, year)
+	if err != nil {
+		return nil, err
+	}
+
 	return &DashboardResponse{
 		Summary:            summary,
 		MonthlyTrend:       monthlyTrend,
@@ -62,6 +73,8 @@ func (s *Service) GetDashboard(ctx context.Context, userID ulid.ULID, accountID 
 		Goals:              goals,
 		BudgetStatus:       budgetStatus,
 		Accounts:           accounts,
+		Categories:         categories,
+		MonthExpenses:      monthExpenses,
 	}, nil
 }
 
@@ -73,6 +86,8 @@ type DashboardResponse struct {
 	Goals              []*GoalSummary        `json:"goals"`
 	BudgetStatus       []*BudgetStatusItem   `json:"budgetStatus"`
 	Accounts           []*AccountSummary     `json:"accounts"`
+	Categories         []*category.Category  `json:"categories"`
+	MonthExpenses      []*TransactionSummary `json:"monthExpenses"`
 }
 
 type FinancialSummary struct {
@@ -100,12 +115,14 @@ type CategoryExpense struct {
 }
 
 type TransactionSummary struct {
-	Id          ulid.ULID `json:"id"`
-	Type        string    `json:"type"`
-	Amount      float64   `json:"amount"`
-	Description string    `json:"description"`
-	CategoryId  ulid.ULID `json:"categoryId"`
-	Date        time.Time `json:"date"`
+	Id           ulid.ULID `json:"id"`
+	Type         string    `json:"type"`
+	Amount       float64   `json:"amount"`
+	Description  string    `json:"description"`
+	CategoryId   ulid.ULID `json:"categoryId"`
+	CategoryName string    `json:"categoryName"`
+	Date         time.Time `json:"date"`
+	AccountId    ulid.ULID `json:"accountId"`
 }
 
 type GoalSummary struct {

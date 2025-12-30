@@ -12,6 +12,7 @@ type CreditCardTransaction struct {
 	InvoiceId         ulid.ULID `gorm:"type:varchar(26);index:idx_cc_transactions_invoice_id;not null" json:"invoiceId"`
 	UserId            ulid.ULID `gorm:"type:varchar(26);index:idx_cc_transactions_user_id;not null" json:"userId"`
 	CategoryId        ulid.ULID `gorm:"type:varchar(26);index:idx_cc_transactions_category_id;not null" json:"categoryId"`
+	CategoryName      string    `gorm:"-" json:"categoryName,omitempty"`
 	Amount            float64    `gorm:"type:decimal(15,2);not null" json:"amount"`
 	Description       string     `gorm:"type:varchar(255)" json:"description"`
 	Date              time.Time  `gorm:"type:date;not null;index:idx_cc_transactions_date" json:"date"`

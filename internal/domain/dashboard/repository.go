@@ -3,6 +3,8 @@ package dashboard
 import (
 	"context"
 
+	"Fynance/internal/domain/transaction"
+
 	"github.com/oklog/ulid/v2"
 )
 
@@ -14,4 +16,6 @@ type Repository interface {
 	GetActiveGoals(ctx context.Context, userID ulid.ULID) ([]*GoalSummary, error)
 	GetBudgetStatus(ctx context.Context, userID ulid.ULID, accountID *ulid.ULID, month, year int) ([]*BudgetStatusItem, error)
 	GetAccountsSummary(ctx context.Context, userID ulid.ULID) ([]*AccountSummary, error)
+	GetUserCategories(ctx context.Context, userID ulid.ULID) ([]*transaction.Category, error)
+	GetMonthExpenses(ctx context.Context, userID ulid.ULID, accountID *ulid.ULID, month, year int) ([]*TransactionSummary, error)
 }

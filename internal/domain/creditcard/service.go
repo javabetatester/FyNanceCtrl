@@ -30,8 +30,8 @@ func (s *Service) CreateCreditCard(ctx context.Context, req *CreateCreditCardReq
 		return nil, err
 	}
 
-	if accountEntity.Type != account.TypeCreditCard {
-		return nil, appErrors.NewValidationError("account_id", "conta deve ser do tipo CREDIT_CARD")
+	if accountEntity.Type == account.TypeCreditCard {
+		return nil, appErrors.NewValidationError("account_id", "conta nao pode ser do tipo CREDIT_CARD")
 	}
 
 	existingCard, _ := s.Repository.GetCreditCardByAccountId(ctx, req.AccountId, req.UserId)
@@ -62,6 +62,23 @@ func (s *Service) CreateCreditCard(ctx context.Context, req *CreateCreditCardReq
 
 	if err := s.Repository.CreateCreditCard(ctx, card); err != nil {
 		return nil, appErrors.NewDatabaseError(err)
+	}
+
+	creditCardAccount := &account.CreateAccountRequest{
+		UserId:         req.UserId,
+		Name:           card.Name,
+		Type:           account.TypeCreditCard,
+		InitialBalance: 0,
+		Color:          "",
+		Icon:           "credit-card",
+		IncludeInTotal: false,
+		CreditCardId:   &card.Id,
+	}
+
+	_, err = s.AccountService.CreateAccount(ctx, creditCardAccount)
+	if err != nil {
+		_ = s.Repository.DeleteCreditCard(ctx, card.Id, req.UserId)
+		return nil, appErrors.NewDatabaseError(fmt.Errorf("erro ao criar conta do cartao: %w", err))
 	}
 
 	return card, nil
@@ -135,7 +152,14 @@ func (s *Service) DeleteCreditCard(ctx context.Context, cardID, userID ulid.ULID
 
 	currentInvoice, err := s.Repository.GetCurrentInvoice(ctx, cardID, userID)
 	if err == nil && currentInvoice != nil && currentInvoice.TotalAmount > 0 {
-		return appErrors.NewValidationError("credit_card", "cartao possui fatura em aberto e nao pode ser removido")
+		return appErrors.NewValidationError("credit_card", "Cartão possui fatura em aberto, não pode remover")
+	}
+
+	creditCardAccount, err := s.AccountService.Repository.GetByCreditCardId(ctx, cardID, userID)
+	if err == nil && creditCardAccount != nil {
+		if err := s.AccountService.Repository.Delete(ctx, creditCardAccount.Id, userID); err != nil {
+			return appErrors.NewDatabaseError(fmt.Errorf("erro ao remover conta do cartao: %w", err))
+		}
 	}
 
 	return s.Repository.DeleteCreditCard(ctx, cardID, userID)
@@ -176,8 +200,16 @@ func (s *Service) CreateTransaction(ctx context.Context, req *CreateTransactionR
 		return appErrors.NewValidationError("credit_card", "cartao nao esta ativo")
 	}
 
-	if card.AvailableLimit < req.Amount {
-		return appErrors.NewValidationError("amount", "limite disponivel insuficiente")
+	amount := req.Amount
+	if amount < 0 {
+		amount = -amount
+	}
+	if amount <= 0 {
+		return appErrors.NewValidationError("amount", "valor deve ser maior que zero")
+	}
+
+	if card.AvailableLimit < amount {
+		return appErrors.NewValidationError("amount", "Limite disponível insuficiente")
 	}
 
 	invoice, err := s.getOrCreateCurrentInvoice(ctx, card)
@@ -187,31 +219,32 @@ func (s *Service) CreateTransaction(ctx context.Context, req *CreateTransactionR
 
 	now := time.Now()
 	transaction := &CreditCardTransaction{
-		Id:                pkg.GenerateULIDObject(),
-		CreditCardId:      req.CreditCardId,
-		InvoiceId:         invoice.Id,
-		UserId:            req.UserId,
-		CategoryId:        req.CategoryId,
-		Amount:            req.Amount,
-		Description:       strings.TrimSpace(req.Description),
-		Date:              req.Date,
-		Installments:      req.Installments,
+		Id:                 pkg.GenerateULIDObject(),
+		CreditCardId:       req.CreditCardId,
+		InvoiceId:          invoice.Id,
+		UserId:             req.UserId,
+		CategoryId:         req.CategoryId,
+		Amount:             amount,
+		Description:        strings.TrimSpace(req.Description),
+		Date:               req.Date,
+		Installments:       req.Installments,
 		CurrentInstallment: 1,
-		IsRecurring:       req.IsRecurring,
-		CreatedAt:         now,
-		UpdatedAt:         now,
+		IsRecurring:        req.IsRecurring,
+		CreatedAt:          now,
+		UpdatedAt:          now,
 	}
 
 	if err := s.Repository.CreateTransaction(ctx, transaction); err != nil {
 		return appErrors.NewDatabaseError(err)
 	}
 
-	invoice.TotalAmount += req.Amount
+	invoice.TotalAmount += amount
 	if err := s.Repository.UpdateInvoice(ctx, invoice); err != nil {
 		return appErrors.NewDatabaseError(err)
 	}
 
-	if err := s.Repository.UpdateAvailableLimit(ctx, req.CreditCardId, -req.Amount); err != nil {
+	deductionAmount := -amount
+	if err := s.Repository.UpdateAvailableLimit(ctx, req.CreditCardId, deductionAmount); err != nil {
 		return appErrors.NewDatabaseError(err)
 	}
 
