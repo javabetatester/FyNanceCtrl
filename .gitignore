@@ -1,3 +1,7 @@
 # Arquivos de ambiente
 .env
 frontend
+# Build outputs
+*.exe
+*.test
+/bin/
